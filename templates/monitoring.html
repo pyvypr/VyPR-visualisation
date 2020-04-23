@@ -1,0 +1,15 @@
+<html>
+<head>
+    <!-- development version, includes helpful console warnings -->
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <title>VyPR Visualisation Tool</title>
+</head>
+<body>
+<div id="app">
+    <p><a href="/">Home</a></p>
+    <timeline event_stream="{{ event_stream_url }}"></timeline>
+    <visualisation></visualisation>
+</div>
+</body>
+<script type="text/javascript" src="{{ url_for('static', filename='js/monitoring.js') }}"></script>
+</html>
