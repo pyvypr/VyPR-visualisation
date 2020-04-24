@@ -1,0 +1,52 @@
+div.event-list {
+    height: 100px!important;
+    width: 100%;
+    overflow-x: scroll;
+}
+
+div.event {
+    margin-top: 10px;
+    margin-bottom: 10px;
+    margin-left: 5px;
+    margin-right: 5px;
+    width: 230px;
+    height: 60px;
+    background: grey;
+    display: float;
+    float: left;
+    cursor: pointer;
+}
+
+div.event.selected {
+    text-decoration: underline;
+}
+
+div.event:hover {
+    text-decoration: underline;
+    color: white;
+}
+
+div.event ul li {
+    list-style: none;
+    margin-left: -35px;
+    font-family: arial;
+    font-size: 12px;
+    color: white;
+}
+
+div.event ul li.time {
+    font-size: 10px;
+    border-bottom: 1px solid white;
+    margin-left: -40px;
+    padding-left: 5px;
+    padding-bottom: 5px;
+    margin-bottom: 5px;
+    padding-top: 5px;
+}
+
+div.visualisation {
+}
+
+div.left-column {
+    width: 40%;
+}

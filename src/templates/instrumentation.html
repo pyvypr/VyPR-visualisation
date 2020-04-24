@@ -1,12 +1,19 @@
 <html>
 <head>
-    <!-- development version, includes helpful console warnings -->
+    <!-- Vue.js for main operations, axios for http and d3 for visualisation. -->
     <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <!-- bootstrap for some css -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css"
+          integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
+    <!-- custom css -->
+    <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/instrumentation.css') }}" rel="stylesheet" />
     <title>VyPR Visualisation Tool</title>
 </head>
 <body>
 <div id="app">
-    <p><a href="/">Home</a></p>
     <timeline event_stream="{{ event_stream_url }}"></timeline>
     <visualisation></visualisation>
 </div>

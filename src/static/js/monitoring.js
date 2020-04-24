@@ -4,19 +4,26 @@ var Store = {
 };
 
 Vue.component("timeline", {
-    template : '<div><p>Timeline:</p><div><span v-for="event in events">{{ event }}, </span></div></div>',
+    template : '<div><button v-on:click="closeEventStream()">stop events</button><p>Timeline:</p><div><span v-for="event in events">{{ event }}, </span></div></div>',
     data : function() {
         return {
-            events : Store.events
+            events : Store.events,
+            stream : null
         }
     },
     props : ["event_stream"],
     mounted : function() {
         var that = this;
-        var eventSource = new EventSource(this.event_stream + '');
-        eventSource.onmessage = function(e) {
+        this.stream = new EventSource(this.event_stream);
+        this.stream.onmessage = function(e) {
             Store.events.push(e.data);
         };
+    },
+    methods : {
+        closeEventStream : function() {
+            alert("closing event stream");
+            this.stream.close();
+        }
     }
 });
 

@@ -58,20 +58,6 @@ def create_app(inst_event_stream_url, mon_event_stream_url):
         """
         return render_template("monitoring.html", event_stream_url=mon_event_stream_url)
 
-    @app.route("/inst-event-stream/", methods=["GET"])
-    def inst_stream():
-        """
-        End-point for fake event stream for instrumentation.
-        """
-        return Response(stream_generator("instrumentation"), mimetype="text/event-stream")
-
-    @app.route("/mon-event-stream/", methods=["GET"])
-    def mon_stream():
-        """
-        End-point for fake event stream for instrumentation.
-        """
-        return Response(stream_generator("monitoring"), mimetype="text/event-stream")
-
     return app
 
 
