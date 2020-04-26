@@ -75,6 +75,10 @@ div.left-column {
     text-align: center;
 }
 
+.scfg {
+  text-align: center;
+}
+
 .node rect {
   stroke: black;
   fill: #fff;
