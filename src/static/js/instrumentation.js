@@ -3,7 +3,139 @@ var Store = {
     selected_event_index : null,
     current_code_listing : [],
     current_function : null,
-    most_recent_function_start_event_index : null
+    most_recent_function_start_event_index : null,
+    // the binding tree is a list of vertices with ids and children
+    binding_tree : []
+};
+
+var select_event = function(index) {
+    var previous_event_index = Store.selected_event_index;
+    // store the event index globally
+    Store.selected_event_index = index;
+    // get the most recent function start event so we can get the function
+    // code and the scfg
+    var begin_function_event_index = index;
+    while(Store.events[begin_function_event_index].action_to_perform != 'begin_function_processing') {
+        begin_function_event_index--;
+    }
+    Store.most_recent_function_start_event_index = begin_function_event_index;
+    // display the code listing
+    var function_begin_event = Store.events[begin_function_event_index];
+    Store.current_code_listing = function_begin_event.data.code;
+    // check if the function has been changed
+    var function_changed =
+        (Store.events[begin_function_event_index].data.function_name != Store.current_function);
+    if(function_changed) {
+        // set the current function name
+        Store.current_function = Store.events[begin_function_event_index].data.function_name;
+    }
+}
+
+var replay_events = function(start_index, end_index) {
+    // given a sequence of events defined by the start and end indices (no restriction on order,
+    // so we can move forwards and backwards in time), replay the events with indication of whether to
+    // apply them normally, or in reverse
+    start_index = start_index === null ? 0 : start_index;
+    if(start_index < end_index) {
+        // replay forwards in time
+        for(var i=start_index+1; i<=end_index; i++) {
+            apply_event(Store.events[i], "forwards");
+        }
+    } else if(start_index > end_index) {
+        // replay backwards in time
+        for(var i=start_index-1; i>=end_index; i--) {
+            apply_event(Store.events[i], "backwards");
+        }
+    }
+    // render the new tree now all transformations have been applied
+    render_binding_tree();
+};
+
+var apply_event = function(event, direction) {
+    // event is a dictionary with an action and data
+    // direction is either "forwards" or "backwards" and affects how we apply the event
+    // note: when we replay an event, we always assume that the existing state is immediately before
+    // or after the event, since we cannot jump between events without applying each one in between.
+    if(direction == "forwards") {
+        if(event.action_to_perform == "new_binding") {
+            // add the new vertex
+            Store.binding_tree.push({
+                "id" : event.data.vertex_id,
+                "children" : [],
+                "marked" : false
+            });
+        } else if(event.action_to_perform == "extend_binding") {
+            // add new vertex
+            Store.binding_tree.push({
+                "id" : event.data.child_vertex_id,
+                "children" : [],
+                "marked" : false
+            });
+            // find the parent vertex and modify it
+            for(var i=0; i<Store.binding_tree.length; i++) {
+                if(Store.binding_tree[i].id == event.data.parent_vertex_id) {
+                    Store.binding_tree[i].children.push(event.data.child_vertex_id);
+                }
+            }
+        } else if(event.action_to_perform == "complete_binding") {
+            // mark the vertices
+            for(var i=0; i<event.data.vertex_ids.length; i++) {
+                for(var j=0; j<Store.binding_tree.length; j++) {
+                    if(Store.binding_tree[j].id == event.data.vertex_ids[i]) {
+                        Store.binding_tree[j].marked = true;
+                    }
+                }
+            }
+        }
+    }
+};
+
+var render_binding_tree = function() {
+    // code inspired by https://github.com/dagrejs/dagre/wiki#an-example-layout
+
+    // Create a new directed graph
+    var g = new dagreD3.graphlib.Graph().setGraph({});
+
+    // Set an object for the graph label
+    g.setGraph({});
+
+    var binding_tree = Store.binding_tree;
+
+    console.log(binding_tree);
+
+    if(binding_tree.length > 0) {
+        // set up nodes
+        for(var i=0; i<binding_tree.length; i++) {
+            var label = String(binding_tree[i].id);
+            var stroke = binding_tree[i].marked ? "red" : "black";
+            g.setNode(
+                binding_tree[i].id,
+                {label : label, width : 5*label.length + 20, height: 20, stroke : stroke}
+            );
+        }
+
+        // set up edges
+        for(var i=0; i<binding_tree.length; i++) {
+            for(var j=0; j<binding_tree[i].children.length; j++) {
+                g.setEdge(binding_tree[i].id, binding_tree[i].children[j], {});
+            }
+        }
+
+        var svg = d3.select("#binding-tree"),
+        inner = svg.select("g");
+
+        // remove all content before rendering anything new
+        inner.selectAll().remove();
+
+        // Create the renderer
+        var render = new dagreD3.render();
+
+        // Run the renderer. This is what draws the final graph.
+        render(inner, g);
+
+        svg.attr('height', g.graph().height + 40);
+        svg.attr('width', g.graph().width);
+    }
 };
 
 Vue.component("timeline", {
@@ -18,7 +150,7 @@ Vue.component("timeline", {
                 <tr>
                     <td v-for="(event, index) in store.events">
                         <div class="event"
-                            v-on:click="handlerEventClick($event, index, event.action_to_perform, event.data)">
+                            v-on:click="handlerEventClick($event, index)">
                         <ul>
                             <li class="time"><i>{{ event.time_added }}</i></li>
                             <li class="action"><b>{{ event.action_to_perform }}</b></li>
@@ -42,26 +174,13 @@ Vue.component("timeline", {
         }
     },
     methods : {
-        handlerEventClick : function(e, index, action, data) {
-            // store the event index globally
-            this.store.selected_event_index = index;
-            // get the most recent function start event so we can get the function
-            // code and the scfg
-            var begin_function_event_index = index;
-            while(this.store.events[begin_function_event_index].action_to_perform != 'begin_function_processing') {
-                begin_function_event_index--;
-            }
-            this.store.most_recent_function_start_event_index = begin_function_event_index;
-            // display the code listing
-            var function_begin_event = this.store.events[begin_function_event_index];
-            this.store.current_code_listing = function_begin_event.data.code;
-            // check if the function has been changed
-            var function_changed =
-                (this.store.events[begin_function_event_index].data.function_name != this.store.current_function);
-            if(function_changed) {
-                // set the current function name
-                this.store.current_function = this.store.events[begin_function_event_index].data.function_name;
-            }
+        handlerEventClick : function(e, index) {
+            // store previous event index
+            var previous_event_index = this.store.selected_event_index;
+            // select the event
+            select_event(index);
+            // now, replay events
+            replay_events(previous_event_index, this.store.selected_event_index);
         }
     },
     props : ["event_stream"],
@@ -71,6 +190,8 @@ Vue.component("timeline", {
             function(response) {
                 // add event data to property which is bound to html
                 that.store.events = response.data;
+                // select the first event
+                select_event(0);
             }
         );
     }
@@ -81,7 +202,7 @@ Vue.component("visualisation", {
     <div id="visualisation" class="container">
         <div class="vis-on" v-if="dataReady">
             <div class="col-md-5">
-                <div class="panel panel-default">
+                <div class="panel panel-info">
                   <div class="panel-heading">Code - {{ store.current_function }}</div>
                   <div class="panel-body" id="code">
                     <table>
@@ -96,7 +217,7 @@ Vue.component("visualisation", {
                     </table>
                   </div>
                 </div>
-                <div class="panel panel-default">
+                <div class="panel panel-info">
                   <div class="panel-heading">Symbolic Control-Flow Graph</div>
                   <div class="panel-body">
                     <scfg></scfg>
@@ -105,12 +226,13 @@ Vue.component("visualisation", {
             </div>
 
             <div class="col-md-7">
-                <div class="panel panel-default">
+                <div class="panel panel-info">
                   <div class="panel-heading">Binding Tree</div>
-                  <div class="panel-body" id="binding-tree">
+                  <div class="panel-body">
+                    <binding-tree></binding-tree>
                   </div>
                 </div>
-                <div class="panel panel-default">
+                <div class="panel panel-info">
                   <div class="panel-heading">Instrumentation Tree</div>
                   <div class="panel-body" id="instrumentation-tree">
                   </div>
@@ -169,7 +291,7 @@ Vue.component("scfg", {
             }
         }
 
-        var svg = d3.select("svg"),
+        var svg = d3.select("#scfg"),
         inner = svg.select("g");
 
         // Create the renderer
@@ -180,6 +302,15 @@ Vue.component("scfg", {
 
         svg.attr('height', g.graph().height + 40);
         svg.attr('width', g.graph().width);
+    }
+});
+
+Vue.component("binding-tree", {
+    template : `<div class="binding-tree"><svg id="binding-tree"><g></g></svg></div>`,
+    data : function() {
+        return {
+            store : Store
+        }
     }
 });
 
