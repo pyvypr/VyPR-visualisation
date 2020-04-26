@@ -8,6 +8,19 @@ var Store = {
     binding_tree : []
 };
 
+var get_state_changed_from_id = function(id) {
+    // given a vertex ID, get the state information held there
+    var scfg = Store.events[Store.most_recent_function_start_event_index].data.scfg;
+    console.log(scfg);
+    console.log(id);
+    for(var i=0; i<scfg.length; i++) {
+        if(scfg[i].id == id) {
+            return String(scfg[i].state_changed);
+        }
+    }
+    return false;
+};
+
 var select_event = function(index) {
     var previous_event_index = Store.selected_event_index;
     // store the event index globally
@@ -43,7 +56,8 @@ var replay_events = function(start_index, end_index) {
         }
     } else if(start_index > end_index) {
         // replay backwards in time
-        for(var i=start_index-1; i>=end_index; i--) {
+        for(var i=start_index; i>end_index; i--) {
+            console.log(Store.events[i]);
             apply_event(Store.events[i], "backwards");
         }
     }
@@ -87,6 +101,44 @@ var apply_event = function(event, direction) {
                 }
             }
         }
+    } else if(direction == "backwards") {
+        if(event.action_to_perform == "begin_function_processing") {
+            // remove all bindings
+            Store.binding_tree = [];
+        } else if(event.action_to_perform == "new_binding") {
+            // find the vertex and remove it
+            for(var i=0; i<Store.binding_tree.length; i++) {
+                if(Store.binding_tree[i].id == event.data.vertex_id) {
+                    Store.binding_tree.splice(i, 1);
+                }
+            }
+        } else if(event.action_to_perform == "extend_binding") {
+            // find the vertex and remove it
+            for(var i=0; i<Store.binding_tree.length; i++) {
+                if(Store.binding_tree[i].id == event.data.child_vertex_id) {
+                    Store.binding_tree.splice(i, 1);
+                }
+            }
+            // find the parent vertex and remove this child
+            for(var i=0; i<Store.binding_tree.length; i++) {
+                if(Store.binding_tree[i].id == event.data.parent_vertex_id) {
+                    for(var j=0; j<Store.binding_tree[i].children.length; j++) {
+                        if(Store.binding_tree[i].children[j] == event.data.child_vertex_id) {
+                            Store.binding_tree[i].children.splice(j, 1);
+                        }
+                    }
+                }
+            }
+        } else if(event.action_to_perform == "complete_binding") {
+            // unmark the vertices
+            for(var i=0; i<event.data.vertex_ids.length; i++) {
+                for(var j=0; j<Store.binding_tree.length; j++) {
+                    if(Store.binding_tree[j].id == event.data.vertex_ids[i]) {
+                        Store.binding_tree[j].marked = false;
+                    }
+                }
+            }
+        }
     }
 };
 
@@ -106,11 +158,11 @@ var render_binding_tree = function() {
     if(binding_tree.length > 0) {
         // set up nodes
         for(var i=0; i<binding_tree.length; i++) {
-            var label = String(binding_tree[i].id);
+            var label = get_state_changed_from_id(binding_tree[i].id);
             var stroke = binding_tree[i].marked ? "red" : "black";
             g.setNode(
                 binding_tree[i].id,
-                {label : label, width : 5*label.length + 20, height: 20, stroke : stroke}
+                {label : label, width : 5*label.length + 20, height: 20, style: "stroke: " + stroke}
             );
         }
 
@@ -125,7 +177,7 @@ var render_binding_tree = function() {
         inner = svg.select("g");
 
         // remove all content before rendering anything new
-        inner.selectAll().remove();
+        inner.selectAll("*").remove();
 
         // Create the renderer
         var render = new dagreD3.render();
@@ -135,6 +187,10 @@ var render_binding_tree = function() {
 
         svg.attr('height', g.graph().height + 40);
         svg.attr('width', g.graph().width);
+    } else {
+        var svg = d3.select("#binding-tree"),
+        inner = svg.select("g");
+        inner.selectAll("*").remove();
     }
 };
 
@@ -306,10 +362,17 @@ Vue.component("scfg", {
 });
 
 Vue.component("binding-tree", {
-    template : `<div class="binding-tree"><svg id="binding-tree"><g></g></svg></div>`,
+    template : `<div class="binding-tree">
+        <svg id="binding-tree"><g><text y="20">No bindings to display</text></g></svg>
+    </div>`,
     data : function() {
         return {
             store : Store
+        }
+    },
+    computed : {
+        show_binding_tree : function() {
+            return this.store.binding_tree.length > 0;
         }
     }
 });
