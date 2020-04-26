@@ -50,3 +50,27 @@ div.visualisation {
 div.left-column {
     width: 40%;
 }
+
+.panel-body#code pre {
+    border: none;
+    background: none;
+    padding: 0;
+    margin: 0;
+}
+
+.code-line .number {
+    width: 30px;
+    padding-right: 10px;
+    text-align: right;
+    font-size: 10px;
+}
+
+.code-line .code-wrapper {
+    width: 370px;
+}
+
+.code-line-skip {
+    height: 40px;
+    vertical-align: center;
+    text-align: center;
+}
