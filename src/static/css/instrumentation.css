@@ -74,3 +74,18 @@ div.left-column {
     vertical-align: center;
     text-align: center;
 }
+
+.node rect {
+  stroke: black;
+  fill: #fff;
+}
+
+.edgePath path {
+  stroke: #333;
+  fill: #333;
+  stroke-width: 1.5px;
+}
+
+.node .label {
+    color: black;
+}

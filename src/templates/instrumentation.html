@@ -1,9 +1,5 @@
 <html>
 <head>
-    <!-- Vue.js for main operations, axios for http and d3 for visualisation. -->
-    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
-    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
-    <script src="https://d3js.org/d3.v5.min.js"></script>
     <!-- bootstrap for some css -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css"
           integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
@@ -17,6 +13,13 @@
     <timeline event_stream="{{ event_stream_url }}"></timeline>
     <visualisation></visualisation>
 </div>
-</body>
+
+<!-- Vue.js for main operations, axios for http and dagre/d3 for graphs. -->
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script src="https://d3js.org/d3.v5.min.js"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/dagre-d3.js') }}"></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/instrumentation.js') }}"></script>
+
+</body>
 </html>

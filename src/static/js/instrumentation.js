@@ -2,7 +2,8 @@ var Store = {
     events : [],
     selected_event_index : null,
     current_code_listing : [],
-    current_function : null
+    current_function : null,
+    current_scfg : null
 };
 
 Vue.component("timeline", {
@@ -53,8 +54,15 @@ Vue.component("timeline", {
             // display the code listing
             var function_begin_event = this.store.events[begin_function_event_index];
             this.store.current_code_listing = function_begin_event.data.code;
-            // set the current function name
-            this.store.current_function = this.store.events[begin_function_event_index].data.function_name
+            // check if the function has been changed
+            var function_changed =
+                (this.store.events[begin_function_event_index].data.function_name != this.store.current_function);
+            if(function_changed) {
+                // set the current function name
+                this.store.current_function = this.store.events[begin_function_event_index].data.function_name;
+                // set the scfg
+                this.store.current_scfg = this.store.events[this.store.selected_event_index].data.scfg;
+            }
         }
     },
     props : ["event_stream"],
@@ -91,7 +99,8 @@ Vue.component("visualisation", {
                 </div>
                 <div class="panel panel-default">
                   <div class="panel-heading">Symbolic Control-Flow Graph</div>
-                  <div class="panel-body" id="scfg">
+                  <div class="panel-body">
+                    <scfg></scfg>
                   </div>
                 </div>
             </div>
@@ -123,6 +132,76 @@ Vue.component("visualisation", {
         eventIsSelected : function() {
             return this.store.selected_event_index != null;
         }
+    }
+});
+
+Vue.component("scfg", {
+    template : `<svg id="scfg"><g></g></svg>`,
+    data : function() {
+        return {
+            store : Store
+        }
+    },
+    mounted : function() {
+        // set up scfg with dagre
+
+        // code inspired by https://github.com/dagrejs/dagre/wiki#an-example-layout
+
+        // Create a new directed graph
+        var g = new dagreD3.graphlib.Graph().setGraph({});
+
+        // Set an object for the graph label
+        g.setGraph({});
+
+        // Default to assigning a new object as a label for each new edge.
+        //g.setDefaultEdgeLabel(function() { return {}; });
+
+        console.log(g.nodes());
+
+        console.log(this.store.current_scfg);
+
+        // set up nodes
+        for(var i=0; i<this.store.current_scfg.length; i++) {
+            g.setNode(
+                this.store.current_scfg[i].id,
+                {label : String(this.store.current_scfg[i].state_changed), width : 110, height: 30}
+            );
+        }
+
+        // set up edges
+        for(var i=0; i<this.store.current_scfg.length; i++) {
+            console.log("setting up edges for " + this.store.current_scfg[i].id);
+            for(var j=0; j<this.store.current_scfg[i].children.length; j++) {
+                g.setEdge(this.store.current_scfg[i].id, this.store.current_scfg[i].children[j], {});
+                console.log("edge from " + String(this.store.current_scfg[i].id) + " to " + String(this.store.current_scfg[i].children[j]));
+            }
+        }
+
+        console.log(g.nodes());
+
+        var svg = d3.select("svg"),
+        inner = svg.select("g");
+
+        // Create the renderer
+        var render = new dagreD3.render();
+
+        // Run the renderer. This is what draws the final graph.
+        render(inner, g);
+
+        /*// Set up zoom support
+        var zoom = d3.zoom().on("zoom", function() {
+              inner.attr("transform", d3.event.transform);
+            });
+        svg.call(zoom);*/
+
+        // Center the graph
+        var initialScale = 0.75;
+        /*svg.call(
+            zoom.transform,
+            d3.zoomIdentity.translate((svg.attr("width") - g.graph().width * initialScale) / 2, 20).scale(initialScale)
+        );*/
+
+        svg.attr('height', g.graph().height * initialScale + 40);
     }
 });
 
