@@ -234,11 +234,19 @@ Vue.component("timeline", {
     template : `
     <div class="timeline">
         <div class="controls">
-            <button type="button" class="btn btn-info">Previous</button>
+            <button type="button" class="btn btn-info"
+                v-bind:class="getClassPreviousButton()"
+                v-on:click="handlerPreviousEvent">
+                Previous
+            </button>
             <button type="button" class="btn btn-success" v-on:click="handlerTogglePlayStatus">
                 {{ play_status }}
             </button>
-            <button type="button" class="btn btn-info">Next</button>
+            <button type="button" class="btn btn-info"
+                v-bind:class="getClassNextButton()"
+                v-on:click="handlerNextEvent">
+                Next
+            </button>
         </div>
         <div class="event-list">
             <table>
@@ -280,6 +288,16 @@ Vue.component("timeline", {
                 return "selected"
             } else return "";
         },
+        getClassNextButton : function() {
+            if(this.store.selected_event_index >= this.store.events.length-1 || this.store.play_interval != null) {
+                return "disabled";
+            } else return ""
+        },
+        getClassPreviousButton : function() {
+            if(this.store.selected_event_index == 0 || this.store.play_interval != null) {
+                return "disabled";
+            } else return ""
+        },
         handlerEventClick : function(e, index) {
             // store previous event index
             var previous_event_index = this.store.selected_event_index;
@@ -296,6 +314,20 @@ Vue.component("timeline", {
             } else {
                 // not playing - start
                 this.store.play_interval = setInterval(play, 1000);
+            }
+        },
+        handlerNextEvent : function(e) {
+            if(this.store.selected_event_index < this.store.events.length-1 && this.store.play_interval == null) {
+                this.store.selected_event_index++;
+                select_event(this.store.selected_event_index);
+                apply_event(this.store.events[this.store.selected_event_index], "forwards");
+            }
+        },
+        handlerPreviousEvent : function(e) {
+            if(this.store.selected_event_index != 0 && this.store.play_interval == null) {
+                select_event(this.store.selected_event_index);
+                apply_event(this.store.events[this.store.selected_event_index], "backwards");
+                this.store.selected_event_index--;
             }
         }
     },
