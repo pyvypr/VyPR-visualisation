@@ -208,7 +208,6 @@ var apply_event = function(event, direction) {
                     Store.instrumentation_tree[binding][atom_index] = points;
                 }
             }
-            render_instrumentation_tree();
         }
         // highlight relevant parts of the screen
         highlight_forwards(event);
@@ -245,12 +244,23 @@ var apply_event = function(event, direction) {
                     }
                 }
             }
+        } else if(event.action_to_perform == "find_inst_set") {
+            // remove from instrumentation tree
+            var binding = event.data.binding;
+            var atom_index = event.data.atom_index;
+            var points = event.data.points;
+            delete Store.instrumentation_tree[binding];
+            if(Object.keys(Store.instrumentation_tree).length === 0 &&
+                Store.instrumentation_tree.constructor === Object) {
+                Store.instrumentation_tree = null;
+            }
         }
         // highlight relevant parts of the screen
         highlight_backwards(event);
     }
-    // render the new tree now all transformations have been applied
+    // render the new trees now all transformations have been applied
     render_binding_trees();
+    render_instrumentation_tree();
 };
 
 var render_binding_trees = function() {
@@ -319,77 +329,87 @@ var render_instrumentation_tree = function() {
     // Create a new directed graph
     var g = new dagreD3.graphlib.Graph().setGraph({rankdir: 'LR'});
 
-    // create an empty root vertex
-    g.setNode(
-        "root",
-        {label : "root", width : 10, height: 20}
-    );
-    // traverse the instrumentation tree object
-    for(var binding in Store.instrumentation_tree) {
-        // create a new vertex for this binding
+    if(Store.instrumentation_tree != null) {
+        // create an empty root vertex
         g.setNode(
-            binding,
-            {label : "Binding " + String(binding), width : 50, height: 20}
+            "root",
+            {label : "root", width : 10, height: 20}
         );
-        g.setEdge("root", binding, {curve: d3.curveBasis});
-        for(var atom_index in Store.instrumentation_tree[binding]) {
-            // create a new vertex for this atom index
+        // traverse the instrumentation tree object
+        for(var binding in Store.instrumentation_tree) {
+            // create a new vertex for this binding
             g.setNode(
-                binding + "-" + atom_index,
-                {label : "Atom index " + String(atom_index), width : 60, height: 20}
-            );
-            g.setEdge(
                 binding,
-                binding + "-" + atom_index,
-                {curve: d3.curveBasis}
+                {label : "Binding " + String(binding), width : 50, height: 20}
             );
-            for(var sub_atom_index in Store.instrumentation_tree[binding][atom_index]) {
-                // create a new vertex for this sub atom index
+            g.setEdge("root", binding, {curve: d3.curveBasis});
+            for(var atom_index in Store.instrumentation_tree[binding]) {
+                // create a new vertex for this atom index
                 g.setNode(
-                    binding + "-" + atom_index + "-" + sub_atom_index,
-                    {label : String(sub_atom_index), width : 20, height: 20}
+                    binding + "-" + atom_index,
+                    {label : "Atom index " + String(atom_index), width : 60, height: 20}
                 );
                 g.setEdge(
+                    binding,
                     binding + "-" + atom_index,
-                    binding + "-" + atom_index + "-" + sub_atom_index,
                     {curve: d3.curveBasis}
                 );
-                for(var point in Store.instrumentation_tree[binding][atom_index][sub_atom_index]) {
-                    var line_number = get_line_number_from_id(
-                                        Store.instrumentation_tree[binding][atom_index][sub_atom_index][point]
-                                    );
-                    // create a new vertex for this instrumentation point
+                for(var sub_atom_index in Store.instrumentation_tree[binding][atom_index]) {
+                    // create a new vertex for this sub atom index
                     g.setNode(
-                        binding + "-" + atom_index + "-" + sub_atom_index + "-" + point,
-                        {
-                            label : line_number == "Line null" ? "-" : line_number,
-                            width : 50, height: 20
-                        }
+                        binding + "-" + atom_index + "-" + sub_atom_index,
+                        {label : String(sub_atom_index), width : 20, height: 20}
                     );
                     g.setEdge(
+                        binding + "-" + atom_index,
                         binding + "-" + atom_index + "-" + sub_atom_index,
-                        binding + "-" + atom_index + "-" + sub_atom_index + "-" + point,
                         {curve: d3.curveBasis}
                     );
+                    for(var point in Store.instrumentation_tree[binding][atom_index][sub_atom_index]) {
+                        var line_number = get_line_number_from_id(
+                                            Store.instrumentation_tree[binding][atom_index][sub_atom_index][point]
+                                        );
+                        // create a new vertex for this instrumentation point
+                        g.setNode(
+                            binding + "-" + atom_index + "-" + sub_atom_index + "-" + point,
+                            {
+                                label : line_number == "Line null" ? "-" : line_number,
+                                width : 50, height: 20
+                            }
+                        );
+                        g.setEdge(
+                            binding + "-" + atom_index + "-" + sub_atom_index,
+                            binding + "-" + atom_index + "-" + sub_atom_index + "-" + point,
+                            {curve: d3.curveBasis}
+                        );
+                    }
                 }
             }
         }
+        var svg = d3.select("#instrumentation-tree"),
+        inner = svg.select("g");
+
+        // remove all content before rendering anything new
+        inner.selectAll("*").remove();
+
+        // Create the renderer
+        var render = new dagreD3.render();
+
+        // Run the renderer. This is what draws the final graph.
+        render(inner, g);
+
+        svg.attr('height', g.graph().height + 40);
+        svg.attr('width', g.graph().width);
+    } else {
+        var svg = d3.select("#instrumentation-tree"),
+        inner = svg.select("g");
+
+        // remove all content before rendering anything new
+        inner.selectAll("*").remove();
+
+        svg.attr('height', 0);
+        svg.attr('width', 0);
     }
-
-    var svg = d3.select("#instrumentation-tree"),
-    inner = svg.select("g");
-
-    // remove all content before rendering anything new
-    inner.selectAll("*").remove();
-
-    // Create the renderer
-    var render = new dagreD3.render();
-
-    // Run the renderer. This is what draws the final graph.
-    render(inner, g);
-
-    svg.attr('height', g.graph().height + 40);
-    svg.attr('width', g.graph().width);
 };
 
 /******************
