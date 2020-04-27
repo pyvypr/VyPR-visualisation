@@ -10,7 +10,8 @@ var Store = {
     most_recent_function_start_event_index : null,
     // each binding tree is a list of vertices with ids and children
     binding_trees : [],
-    play_interval : null
+    play_interval : null,
+    instrumentation_tree : null
 };
 
 /******************
@@ -23,6 +24,17 @@ var get_state_changed_from_id = function(id) {
     for(var i=0; i<scfg.length; i++) {
         if(scfg[i].id == id) {
             return String(scfg[i].state_changed);
+        }
+    }
+    return false;
+};
+
+var get_line_number_from_id = function(id) {
+    // given a vertex ID, get the state information held there
+    var scfg = Store.events[Store.most_recent_function_start_event_index].data.scfg;
+    for(var i=0; i<scfg.length; i++) {
+        if(scfg[i].id == id) {
+            return "Line " + String(scfg[i].line_number);
         }
     }
     return false;
@@ -178,6 +190,25 @@ var apply_event = function(event, direction) {
                     }
                 }
             }
+        } else if(event.action_to_perform == "find_inst_set") {
+            // add to instrumentation tree
+            var binding = event.data.binding;
+            var atom_index = event.data.atom_index;
+            var points = event.data.points;
+            if(Store.instrumentation_tree == null) {
+                Store.instrumentation_tree = {};
+                Store.instrumentation_tree[binding] = {};
+                Store.instrumentation_tree[binding][atom_index] = points;
+            } else {
+                if(binding in Store.instrumentation_tree) {
+                    // atom_index cannot already be here if we're seeing an event with it now
+                    Store.instrumentation_tree[binding][atom_index] = points;
+                } else {
+                    Store.instrumentation_tree[binding] = {};
+                    Store.instrumentation_tree[binding][atom_index] = points;
+                }
+            }
+            render_instrumentation_tree();
         }
         // highlight relevant parts of the screen
         highlight_forwards(event);
@@ -239,7 +270,7 @@ var render_binding_trees = function() {
             if(binding_tree.length > 0) {
                 // set up nodes
                 for(var i=0; i<binding_tree.length; i++) {
-                    var label = get_state_changed_from_id(binding_tree[i].id);
+                    var label = get_line_number_from_id(binding_tree[i].id);
                     var stroke = binding_tree[i].marked ? "red" : "black";
                     g.setNode(
                         binding_tree[i].id + "-" + binding_tree_index,
@@ -281,6 +312,84 @@ var render_binding_trees = function() {
         svg.attr('height', 0);
         svg.attr('width', 0);
     }
+};
+
+var render_instrumentation_tree = function() {
+    // code inspired by https://github.com/dagrejs/dagre/wiki#an-example-layout
+    // Create a new directed graph
+    var g = new dagreD3.graphlib.Graph().setGraph({rankdir: 'LR'});
+
+    // create an empty root vertex
+    g.setNode(
+        "root",
+        {label : "root", width : 10, height: 20}
+    );
+    // traverse the instrumentation tree object
+    for(var binding in Store.instrumentation_tree) {
+        // create a new vertex for this binding
+        g.setNode(
+            binding,
+            {label : "Binding " + String(binding), width : 50, height: 20}
+        );
+        g.setEdge("root", binding, {curve: d3.curveBasis});
+        for(var atom_index in Store.instrumentation_tree[binding]) {
+            // create a new vertex for this atom index
+            g.setNode(
+                binding + "-" + atom_index,
+                {label : "Atom index " + String(atom_index), width : 60, height: 20}
+            );
+            g.setEdge(
+                binding,
+                binding + "-" + atom_index,
+                {curve: d3.curveBasis}
+            );
+            for(var sub_atom_index in Store.instrumentation_tree[binding][atom_index]) {
+                // create a new vertex for this sub atom index
+                g.setNode(
+                    binding + "-" + atom_index + "-" + sub_atom_index,
+                    {label : String(sub_atom_index), width : 20, height: 20}
+                );
+                g.setEdge(
+                    binding + "-" + atom_index,
+                    binding + "-" + atom_index + "-" + sub_atom_index,
+                    {curve: d3.curveBasis}
+                );
+                for(var point in Store.instrumentation_tree[binding][atom_index][sub_atom_index]) {
+                    var line_number = get_line_number_from_id(
+                                        Store.instrumentation_tree[binding][atom_index][sub_atom_index][point]
+                                    );
+                    // create a new vertex for this instrumentation point
+                    g.setNode(
+                        binding + "-" + atom_index + "-" + sub_atom_index + "-" + point,
+                        {
+                            label : line_number == "Line null" ? "-" : line_number,
+                            width : 50, height: 20
+                        }
+                    );
+                    g.setEdge(
+                        binding + "-" + atom_index + "-" + sub_atom_index,
+                        binding + "-" + atom_index + "-" + sub_atom_index + "-" + point,
+                        {curve: d3.curveBasis}
+                    );
+                }
+            }
+        }
+    }
+
+    var svg = d3.select("#instrumentation-tree"),
+    inner = svg.select("g");
+
+    // remove all content before rendering anything new
+    inner.selectAll("*").remove();
+
+    // Create the renderer
+    var render = new dagreD3.render();
+
+    // Run the renderer. This is what draws the final graph.
+    render(inner, g);
+
+    svg.attr('height', g.graph().height + 40);
+    svg.attr('width', g.graph().width);
 };
 
 /******************
@@ -405,6 +514,11 @@ Vue.component("visualisation", {
         <div class="vis-on" v-if="dataReady">
             <div class="col-sm-3">
                 <div class="panel panel-info">
+                  <div class="panel-heading">Query</div>
+                  <div class="panel-body" id="query" v-html="store.current_specification">
+                  </div>
+                </div>
+                <div class="panel panel-info">
                   <div class="panel-heading">Symbolic Control-Flow Graph</div>
                   <div class="panel-body">
                     <scfg></scfg>
@@ -413,11 +527,6 @@ Vue.component("visualisation", {
             </div>
 
             <div class="col-sm-5">
-                <div class="panel panel-info">
-                  <div class="panel-heading">Query</div>
-                  <div class="panel-body" id="query" v-html="store.current_specification">
-                  </div>
-                </div>
 
                 <div class="panel panel-info">
                   <div class="panel-heading">Code - <b>{{ store.current_function }}</b></div>
@@ -435,6 +544,14 @@ Vue.component("visualisation", {
                     </table>
                   </div>
                 </div>
+
+                <div class="panel panel-info">
+                  <div class="panel-heading">Instrumentation Tree</div>
+                  <div class="panel-body">
+                    <instrumentation-tree></instrumentation-tree>
+                  </div>
+                </div>
+
             </div>
 
             <div class="col-sm-4">
@@ -442,11 +559,6 @@ Vue.component("visualisation", {
                   <div class="panel-heading">Binding Tree</div>
                   <div class="panel-body">
                     <binding-tree></binding-tree>
-                  </div>
-                </div>
-                <div class="panel panel-info">
-                  <div class="panel-heading">Instrumentation Tree</div>
-                  <div class="panel-body" id="instrumentation-tree">
                   </div>
                 </div>
             </div>
@@ -537,6 +649,23 @@ Vue.component("binding-tree", {
     computed : {
         bindings_empty : function() {
             return this.store.binding_trees.length == 0;
+        }
+    }
+});
+
+Vue.component("instrumentation-tree", {
+    template : `<div class="instrumentation-tree">
+        <svg id="instrumentation-tree" height="0" width="0"><g></g></svg>
+        <p v-if="instrumentation_tree_empty">No instrumentation points to display</p>
+    </div>`,
+    data : function() {
+        return {
+            store : Store
+        }
+    },
+    computed : {
+        instrumentation_tree_empty : function() {
+            return this.store.instrumentation_tree == null;
         }
     }
 });
