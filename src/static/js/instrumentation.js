@@ -4,21 +4,40 @@ var Store = {
     current_code_listing : [],
     current_function : null,
     most_recent_function_start_event_index : null,
-    // the binding tree is a list of vertices with ids and children
-    binding_tree : []
+    // each binding tree is a list of vertices with ids and children
+    binding_trees : [],
+    play_interval : null
 };
+
+/******************
+Visualisation Logic
+*******************/
 
 var get_state_changed_from_id = function(id) {
     // given a vertex ID, get the state information held there
     var scfg = Store.events[Store.most_recent_function_start_event_index].data.scfg;
-    console.log(scfg);
-    console.log(id);
     for(var i=0; i<scfg.length; i++) {
         if(scfg[i].id == id) {
             return String(scfg[i].state_changed);
         }
     }
     return false;
+};
+
+var play = function() {
+    // this is only ever set inside an interval
+    // advance events by replaying from current position onwards.
+    if(Store.selected_event_index < Store.events.length-1) {
+        Store.selected_event_index++;
+        select_event(Store.selected_event_index);
+        apply_event(Store.events[Store.selected_event_index], "forwards");
+    } else {
+        // stop playing
+        clearInterval(Store.play_interval);
+        Store.play_interval = null;
+        // make sure the selected event index stays as the final event, and not past it
+        Store.selected_event_index = Store.events.length-1;
+    }
 };
 
 var select_event = function(index) {
@@ -57,12 +76,9 @@ var replay_events = function(start_index, end_index) {
     } else if(start_index > end_index) {
         // replay backwards in time
         for(var i=start_index; i>end_index; i--) {
-            console.log(Store.events[i]);
             apply_event(Store.events[i], "backwards");
         }
     }
-    // render the new tree now all transformations have been applied
-    render_binding_tree();
 };
 
 var apply_event = function(event, direction) {
@@ -72,31 +88,35 @@ var apply_event = function(event, direction) {
     // or after the event, since we cannot jump between events without applying each one in between.
     if(direction == "forwards") {
         if(event.action_to_perform == "new_binding") {
-            // add the new vertex
-            Store.binding_tree.push({
+            // start a new binding tree and add a new vertex
+            Store.binding_trees.push([]);
+            Store.binding_trees[Store.binding_trees.length-1].push({
                 "id" : event.data.vertex_id,
                 "children" : [],
                 "marked" : false
             });
         } else if(event.action_to_perform == "extend_binding") {
             // add new vertex
-            Store.binding_tree.push({
+            Store.binding_trees[Store.binding_trees.length-1].push({
                 "id" : event.data.child_vertex_id,
                 "children" : [],
                 "marked" : false
             });
             // find the parent vertex and modify it
-            for(var i=0; i<Store.binding_tree.length; i++) {
-                if(Store.binding_tree[i].id == event.data.parent_vertex_id) {
-                    Store.binding_tree[i].children.push(event.data.child_vertex_id);
+            for(var i=0; i<Store.binding_trees[Store.binding_trees.length-1].length; i++) {
+                if(Store.binding_trees[Store.binding_trees.length-1][i].id
+                    == event.data.parent_vertex_id) {
+                    Store.binding_trees[Store.binding_trees.length-1][i].children.push(
+                        event.data.child_vertex_id
+                    );
                 }
             }
         } else if(event.action_to_perform == "complete_binding") {
             // mark the vertices
             for(var i=0; i<event.data.vertex_ids.length; i++) {
-                for(var j=0; j<Store.binding_tree.length; j++) {
-                    if(Store.binding_tree[j].id == event.data.vertex_ids[i]) {
-                        Store.binding_tree[j].marked = true;
+                for(var j=0; j<Store.binding_trees[Store.binding_trees.length-1].length; j++) {
+                    if(Store.binding_trees[Store.binding_trees.length-1][j].id == event.data.vertex_ids[i]) {
+                        Store.binding_trees[Store.binding_trees.length-1][j].marked = true;
                     }
                 }
             }
@@ -104,27 +124,28 @@ var apply_event = function(event, direction) {
     } else if(direction == "backwards") {
         if(event.action_to_perform == "begin_function_processing") {
             // remove all bindings
-            Store.binding_tree = [];
+            Store.binding_trees[Store.binding_trees.length-1] = [];
         } else if(event.action_to_perform == "new_binding") {
-            // find the vertex and remove it
-            for(var i=0; i<Store.binding_tree.length; i++) {
+            // remove the last binding tree
+            Store.binding_trees.splice(Store.binding_trees.length-1, 1);
+            /*for(var i=0; i<Store.binding_tree.length; i++) {
                 if(Store.binding_tree[i].id == event.data.vertex_id) {
                     Store.binding_tree.splice(i, 1);
                 }
-            }
+            }*/
         } else if(event.action_to_perform == "extend_binding") {
             // find the vertex and remove it
-            for(var i=0; i<Store.binding_tree.length; i++) {
-                if(Store.binding_tree[i].id == event.data.child_vertex_id) {
-                    Store.binding_tree.splice(i, 1);
+            for(var i=0; i<Store.binding_trees[Store.binding_trees.length-1].length; i++) {
+                if(Store.binding_trees[Store.binding_trees.length-1][i].id == event.data.child_vertex_id) {
+                    Store.binding_trees[Store.binding_trees.length-1].splice(i, 1);
                 }
             }
             // find the parent vertex and remove this child
-            for(var i=0; i<Store.binding_tree.length; i++) {
-                if(Store.binding_tree[i].id == event.data.parent_vertex_id) {
-                    for(var j=0; j<Store.binding_tree[i].children.length; j++) {
-                        if(Store.binding_tree[i].children[j] == event.data.child_vertex_id) {
-                            Store.binding_tree[i].children.splice(j, 1);
+            for(var i=0; i<Store.binding_trees[Store.binding_trees.length-1].length; i++) {
+                if(Store.binding_trees[Store.binding_trees.length-1][i].id == event.data.parent_vertex_id) {
+                    for(var j=0; j<Store.binding_trees[Store.binding_trees.length-1][i].children.length; j++) {
+                        if(Store.binding_trees[Store.binding_trees.length-1][i].children[j] == event.data.child_vertex_id) {
+                            Store.binding_trees[Store.binding_trees.length-1][i].children.splice(j, 1);
                         }
                     }
                 }
@@ -132,44 +153,53 @@ var apply_event = function(event, direction) {
         } else if(event.action_to_perform == "complete_binding") {
             // unmark the vertices
             for(var i=0; i<event.data.vertex_ids.length; i++) {
-                for(var j=0; j<Store.binding_tree.length; j++) {
-                    if(Store.binding_tree[j].id == event.data.vertex_ids[i]) {
-                        Store.binding_tree[j].marked = false;
+                for(var j=0; j<Store.binding_trees[Store.binding_trees.length-1].length; j++) {
+                    if(Store.binding_trees[Store.binding_trees.length-1][j].id == event.data.vertex_ids[i]) {
+                        Store.binding_trees[Store.binding_trees.length-1][j].marked = false;
                     }
                 }
             }
         }
     }
+    // render the new tree now all transformations have been applied
+    render_binding_trees();
 };
 
-var render_binding_tree = function() {
+var render_binding_trees = function() {
     // code inspired by https://github.com/dagrejs/dagre/wiki#an-example-layout
-
     // Create a new directed graph
     var g = new dagreD3.graphlib.Graph().setGraph({});
 
     // Set an object for the graph label
-    g.setGraph({});
+    g.setGraph({rankdir:'LR'});
 
-    var binding_tree = Store.binding_tree;
+    if(Store.binding_trees.length > 0) {
+        // iterate through binding trees
+        for(var binding_tree_index = 0; binding_tree_index < Store.binding_trees.length; binding_tree_index++) {
 
-    console.log(binding_tree);
+            var binding_tree = Store.binding_trees[binding_tree_index];
 
-    if(binding_tree.length > 0) {
-        // set up nodes
-        for(var i=0; i<binding_tree.length; i++) {
-            var label = get_state_changed_from_id(binding_tree[i].id);
-            var stroke = binding_tree[i].marked ? "red" : "black";
-            g.setNode(
-                binding_tree[i].id,
-                {label : label, width : 5*label.length + 20, height: 20, style: "stroke: " + stroke}
-            );
-        }
+            if(binding_tree.length > 0) {
+                // set up nodes
+                for(var i=0; i<binding_tree.length; i++) {
+                    var label = get_state_changed_from_id(binding_tree[i].id);
+                    var stroke = binding_tree[i].marked ? "red" : "black";
+                    g.setNode(
+                        binding_tree[i].id + "-" + binding_tree_index,
+                        {label : label, width : 5*label.length + 20, height: 20, style: "stroke: " + stroke}
+                    );
+                }
 
-        // set up edges
-        for(var i=0; i<binding_tree.length; i++) {
-            for(var j=0; j<binding_tree[i].children.length; j++) {
-                g.setEdge(binding_tree[i].id, binding_tree[i].children[j], {});
+                // set up edges
+                for(var i=0; i<binding_tree.length; i++) {
+                    for(var j=0; j<binding_tree[i].children.length; j++) {
+                        g.setEdge(
+                            binding_tree[i].id + "-" + binding_tree_index,
+                            binding_tree[i].children[j] + "-" + binding_tree_index,
+                            {curve: d3.curveBasis}
+                        );
+                    }
+                }
             }
         }
 
@@ -190,23 +220,33 @@ var render_binding_tree = function() {
     } else {
         var svg = d3.select("#binding-tree"),
         inner = svg.select("g");
-        inner.selectAll("*").remove();
+
+        svg.attr('height', 0);
+        svg.attr('width', 0);
     }
 };
 
+/******************
+Vue Components
+*******************/
+
 Vue.component("timeline", {
-    template : `<div class="timeline">
-        <ul class="nav nav-pills">
-          <li role="presentation"><a href="/">Home</a></li>
-          <li role="presentation"><a href="/instrumentation/">Instrumentation</a></li>
-          <li role="presentation"><a href="/monitoring">Monitoring</a></li>
-        </ul>
+    template : `
+    <div class="timeline">
+        <div class="controls">
+            <button type="button" class="btn btn-info">Previous</button>
+            <button type="button" class="btn btn-success" v-on:click="handlerTogglePlayStatus">
+                {{ play_status }}
+            </button>
+            <button type="button" class="btn btn-info">Next</button>
+        </div>
         <div class="event-list">
             <table>
                 <tr>
                     <td v-for="(event, index) in store.events">
                         <div class="event"
-                            v-on:click="handlerEventClick($event, index)">
+                            v-on:click="handlerEventClick($event, index)"
+                            v-bind:class="getSelectedStatus(index)">
                         <ul>
                             <li class="time"><i>{{ event.time_added }}</i></li>
                             <li class="action"><b>{{ event.action_to_perform }}</b></li>
@@ -229,7 +269,17 @@ Vue.component("timeline", {
             store : Store
         }
     },
+    computed : {
+        play_status : function() {
+            return this.store.play_interval == null ? "Play" : "Pause";
+        }
+    },
     methods : {
+        getSelectedStatus : function(event_index) {
+            if(this.store.selected_event_index == event_index) {
+                return "selected"
+            } else return "";
+        },
         handlerEventClick : function(e, index) {
             // store previous event index
             var previous_event_index = this.store.selected_event_index;
@@ -237,6 +287,16 @@ Vue.component("timeline", {
             select_event(index);
             // now, replay events
             replay_events(previous_event_index, this.store.selected_event_index);
+        },
+        handlerTogglePlayStatus : function(e) {
+            if(this.store.play_interval != null) {
+                // already playing - stop
+                clearInterval(this.store.play_interval);
+                this.store.play_interval = null;
+            } else {
+                // not playing - start
+                this.store.play_interval = setInterval(play, 1000);
+            }
         }
     },
     props : ["event_stream"],
@@ -255,9 +315,18 @@ Vue.component("timeline", {
 
 Vue.component("visualisation", {
     template : `
-    <div id="visualisation" class="container">
+    <div id="visualisation" class="container-fluid">
         <div class="vis-on" v-if="dataReady">
-            <div class="col-md-5">
+            <div class="col-sm-3">
+                <div class="panel panel-info">
+                  <div class="panel-heading">Symbolic Control-Flow Graph</div>
+                  <div class="panel-body">
+                    <scfg></scfg>
+                  </div>
+                </div>
+            </div>
+
+            <div class="col-sm-5">
                 <div class="panel panel-info">
                   <div class="panel-heading">Code - {{ store.current_function }}</div>
                   <div class="panel-body" id="code">
@@ -273,15 +342,9 @@ Vue.component("visualisation", {
                     </table>
                   </div>
                 </div>
-                <div class="panel panel-info">
-                  <div class="panel-heading">Symbolic Control-Flow Graph</div>
-                  <div class="panel-body">
-                    <scfg></scfg>
-                  </div>
-                </div>
             </div>
 
-            <div class="col-md-7">
+            <div class="col-sm-4">
                 <div class="panel panel-info">
                   <div class="panel-heading">Binding Tree</div>
                   <div class="panel-body">
@@ -343,7 +406,7 @@ Vue.component("scfg", {
         // set up edges
         for(var i=0; i<scfg.length; i++) {
             for(var j=0; j<scfg[i].children.length; j++) {
-                g.setEdge(scfg[i].id, scfg[i].children[j], {});
+                g.setEdge(scfg[i].id, scfg[i].children[j], {curve: d3.curveBasis});
             }
         }
 
@@ -363,7 +426,8 @@ Vue.component("scfg", {
 
 Vue.component("binding-tree", {
     template : `<div class="binding-tree">
-        <svg id="binding-tree"><g><text y="20">No bindings to display</text></g></svg>
+        <svg id="binding-tree" height="0" width="0"><g></g></svg>
+        <p v-if="bindings_empty">No bindings to display</p>
     </div>`,
     data : function() {
         return {
@@ -371,8 +435,8 @@ Vue.component("binding-tree", {
         }
     },
     computed : {
-        show_binding_tree : function() {
-            return this.store.binding_tree.length > 0;
+        bindings_empty : function() {
+            return this.store.binding_trees.length == 0;
         }
     }
 });

@@ -1,3 +1,8 @@
+div.controls {
+    text-align: center;
+    padding: 2px;
+}
+
 div.event-list {
     height: 100px!important;
     width: 100%;
@@ -18,7 +23,7 @@ div.event {
 }
 
 div.event.selected {
-    text-decoration: underline;
+    height: 70px;
 }
 
 div.event:hover {
