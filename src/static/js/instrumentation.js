@@ -1,6 +1,10 @@
 var Store = {
     events : [],
+    id_to_event : {},
     selected_event_index : null,
+    highlighted_scfg_vertex : null,
+    highlighted_line_number : null,
+    highlighted_spec_variable : null,
     current_code_listing : [],
     current_function : null,
     most_recent_function_start_event_index : null,
@@ -22,6 +26,59 @@ var get_state_changed_from_id = function(id) {
         }
     }
     return false;
+};
+
+var highlight_line_from_vertex_id = function(vertex_id) {
+    // to highlight the relevant line, we need to search the scfg for the id and take the line number
+    var scfg = Store.events[Store.most_recent_function_start_event_index].data.scfg;
+    for(var i=0; i<scfg.length; i++) {
+        if(scfg[i].id == vertex_id) {
+            Store.highlighted_line_number = scfg[i].line_number
+        }
+    }
+};
+
+var highlight_backwards = function(event) {
+    // highlighting of lines and scfg vertices for moving backwards through time
+    var previous_event = Store.id_to_event[event.id-1];
+    if(previous_event.action_to_perform == "extend_binding") {
+        Store.highlighted_scfg_vertex = Store.id_to_event[event.id-1].data.child_vertex_id;
+        highlight_line_from_vertex_id(Store.id_to_event[event.id-1].data.child_vertex_id);
+    } else if(previous_event.action_to_perform == "new_binding") {
+        Store.highlighted_scfg_vertex = Store.id_to_event[event.id-1].data.vertex_id;
+        highlight_line_from_vertex_id(Store.id_to_event[event.id-1].data.vertex_id);
+    } else if(previous_event.action_to_perform == "complete_binding") {
+        Store.highlighted_scfg_vertex = Store.id_to_event[event.id-1].data.vertex_ids[
+            Store.id_to_event[event.id-1].data.vertex_ids.length-1
+        ];
+        highlight_line_from_vertex_id(
+            Store.id_to_event[event.id-1].data.vertex_ids[
+                Store.id_to_event[event.id-1].data.vertex_ids.length-1
+            ]
+        );
+    }
+};
+
+var highlight_forwards = function(event) {
+    // highlighting of lines and scfg vertices for moving forwards through time
+    Store.highlighted_scfg_vertex = event.data.child_vertex_id;
+    highlight_line_from_vertex_id(event.data.child_vertex_id);
+    if(event.action_to_perform == "extend_binding") {
+        Store.highlighted_scfg_vertex = event.data.child_vertex_id;
+        highlight_line_from_vertex_id(event.data.child_vertex_id);
+    } else if(event.action_to_perform == "new_binding") {
+        Store.highlighted_scfg_vertex = event.data.vertex_id;
+        highlight_line_from_vertex_id(event.data.vertex_id);
+    } else if(event.action_to_perform == "complete_binding") {
+        Store.highlighted_scfg_vertex = event.data.vertex_ids[
+            event.data.vertex_ids.length-1
+        ];
+        highlight_line_from_vertex_id(
+            event.data.vertex_ids[
+                event.data.vertex_ids.length-1
+            ]
+        );
+    }
 };
 
 var play = function() {
@@ -54,6 +111,7 @@ var select_event = function(index) {
     // display the code listing
     var function_begin_event = Store.events[begin_function_event_index];
     Store.current_code_listing = function_begin_event.data.code;
+    Store.current_specification = function_begin_event.data.specification;
     // check if the function has been changed
     var function_changed =
         (Store.events[begin_function_event_index].data.function_name != Store.current_function);
@@ -121,6 +179,8 @@ var apply_event = function(event, direction) {
                 }
             }
         }
+        // highlight relevant parts of the screen
+        highlight_forwards(event);
     } else if(direction == "backwards") {
         if(event.action_to_perform == "begin_function_processing") {
             // remove all bindings
@@ -128,11 +188,6 @@ var apply_event = function(event, direction) {
         } else if(event.action_to_perform == "new_binding") {
             // remove the last binding tree
             Store.binding_trees.splice(Store.binding_trees.length-1, 1);
-            /*for(var i=0; i<Store.binding_tree.length; i++) {
-                if(Store.binding_tree[i].id == event.data.vertex_id) {
-                    Store.binding_tree.splice(i, 1);
-                }
-            }*/
         } else if(event.action_to_perform == "extend_binding") {
             // find the vertex and remove it
             for(var i=0; i<Store.binding_trees[Store.binding_trees.length-1].length; i++) {
@@ -160,6 +215,8 @@ var apply_event = function(event, direction) {
                 }
             }
         }
+        // highlight relevant parts of the screen
+        highlight_backwards(event);
     }
     // render the new tree now all transformations have been applied
     render_binding_trees();
@@ -258,13 +315,6 @@ Vue.component("timeline", {
                         <ul>
                             <li class="time"><i>{{ event.time_added }}</i></li>
                             <li class="action"><b>{{ event.action_to_perform }}</b></li>
-                            <li v-if="event.action_to_perform == 'new_binding'">root vertex: {{ event.data.vertex_id }}</li>
-                            <li v-if="event.action_to_perform == 'extend_binding'">
-                                from {{ event.data.parent_vertex_id }} to {{ event.data.child_vertex_id }}
-                            </li>
-                            <li v-if="event.action_to_perform == 'complete_binding'">full binding: {{ event.data.vertex_ids }}
-                            </li>
-                            <li v-if="event.action_to_perform == 'begin_function_processing'">{{ event.data.function_name }}</li>
                         </ul>
                         </div>
                     </td>
@@ -338,6 +388,10 @@ Vue.component("timeline", {
             function(response) {
                 // add event data to property which is bound to html
                 that.store.events = response.data;
+                // build the event index
+                for(var i=0; i<that.store.events.length; i++) {
+                    that.store.id_to_event[that.store.events[i].id] = that.store.events[i];
+                }
                 // select the first event
                 select_event(0);
             }
@@ -360,14 +414,21 @@ Vue.component("visualisation", {
 
             <div class="col-sm-5">
                 <div class="panel panel-info">
-                  <div class="panel-heading">Code - {{ store.current_function }}</div>
+                  <div class="panel-heading">Query</div>
+                  <div class="panel-body" id="query" v-html="store.current_specification">
+                  </div>
+                </div>
+
+                <div class="panel panel-info">
+                  <div class="panel-heading">Code - <b>{{ store.current_function }}</b></div>
                   <div class="panel-body" id="code">
                     <table>
                         <tr class="code-line-skip" v-if="store.current_code_listing[0].number > 1">
                             <td class="number"></td>
                             <td class="code-wrapper">...</td>
                         </tr>
-                        <tr class="code-line" v-for="line in store.current_code_listing">
+                        <tr class="code-line" v-for="line in store.current_code_listing"
+                            v-bind:class="getLineHighlightStatus(line.number)">
                             <td class="number">{{ line.number }}</td>
                             <td class="code-wrapper"><pre class="code">{{ line.code }}</pre></td>
                         </tr>
@@ -403,6 +464,13 @@ Vue.component("visualisation", {
     computed : {
         dataReady : function() {
             return this.store.selected_event_index != null;
+        }
+    },
+    methods : {
+        getLineHighlightStatus : function(line_number) {
+            if(Store.highlighted_line_number == line_number) {
+                return "highlighted";
+            } else return ""
         }
     }
 });
