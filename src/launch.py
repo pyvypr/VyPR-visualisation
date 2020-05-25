@@ -16,17 +16,6 @@ parser.add_argument("--monitoring-stream", required=True, type=str,
 args = parser.parse_args()
 
 
-def stream_generator(mode):
-    """
-    Generates a stream.
-    :return: event stream.
-    """
-    rows = ["%s event %i" % (mode, i) for i in range(100)]
-    for row in rows:
-        yield "data: %s\n\n" % row
-        time.sleep(1)
-
-
 def create_app(inst_event_stream_url, mon_event_stream_url):
     """
     Flask app factory.
