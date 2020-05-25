@@ -417,7 +417,10 @@ Vue.component("instrument-fired", {
 Vue.component("formula-trees", {
     template : `
     <div class="formula-tree-list">
-        <ul v-for="(binding_index_list, property_hash) in monitorTree">
+        <p v-if="monitorTreeEmpty">
+            No monitoring state exists yet.
+        </p>
+        <ul v-else v-for="(binding_index_list, property_hash) in monitorTree">
             <li>
             <div class="property-hash">{{ property_hash }}</div>
             <ul v-for="binding_index in binding_index_list">
@@ -439,6 +442,9 @@ Vue.component("formula-trees", {
         }
     },
     computed : {
+        monitorTreeEmpty : function() {
+            return Store.property_binding_maps.length == 0;
+        },
         monitorTree : function() {
             var tree = {};
             for(var index in Store.property_binding_maps) {
