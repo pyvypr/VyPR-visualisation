@@ -45,6 +45,7 @@ var select_event = function(index) {
     var function_begin_event = Store.events[begin_function_event_index];
     Store.current_code_listing = function_begin_event.data.code;
     Store.current_specification = function_begin_event.data.specification;
+    Store.current_bindings = function_begin_event.data.bindings;
     // check if the function has been changed
     var function_changed =
         (Store.events[begin_function_event_index].data.function != Store.current_function);
@@ -119,6 +120,21 @@ var apply_event = function(event, direction) {
                     render_formula_tree(data.property_hash, data.binding_index, i);
                 }
             }
+        } else if(event.action_to_perform == "collapse-monitor") {
+            // the formula tree index given by VyPR is local to the property/binding pair,
+            // so we have to iterate through the global list and keep a count to determine which
+            // formula tree corresponds to the local index given
+            var local_count = 0;
+            for(var i=0; i<Store.property_binding_maps.length; i++) {
+                if(Store.property_binding_maps[i].property_hash == data.property_hash &&
+                    Store.property_binding_maps[i].binding_index == data.binding_index) {
+                    if(local_count == data.formula_tree_index) {
+                        Store.formula_trees[i].verdict = data.verdict;
+                    } else {
+                        local_count++;
+                    }
+                }
+            }
         }
     } else if(direction == "backwards") {
     }
@@ -167,6 +183,16 @@ var render_formula_tree = function(property_hash, binding_index, formula_tree_in
     // give correct size to parent formula tree wrapper
     $("#" + property_hash + "-" + binding_index + "-" + formula_tree_index).parent().width(g.graph().width);
     $("#" + property_hash + "-" + binding_index + "-" + formula_tree_index).parent().height(g.graph().height);
+
+    // set the border of the parent to indicate verdict
+    verdict_class_map = {
+        "None" : "inconclusive",
+        "True" : "true",
+        "False" : "false"
+    };
+    $("#" + property_hash + "-" + binding_index + "-" + formula_tree_index).parent().addClass(
+        verdict_class_map[formula_tree.verdict]
+    );
 };
 
 var build_graph = function(graph, subtree) {
@@ -345,11 +371,11 @@ Vue.component("instrument-fired", {
 Vue.component("formula-trees", {
     template : `
     <div class="formula-tree-list">
-        <ul v-for="(binding_index_list, property_hash) in this.monitorTree">
+        <ul v-for="(binding_index_list, property_hash) in monitorTree">
             <li>
-            {{ property_hash }}
+            <div class="property-hash">{{ property_hash }}</div>
             <ul v-for="binding_index in binding_index_list">
-                <p>Binding {{ binding_index }}</p>
+                <div class="binding">Binding - lines {{ store.current_bindings[binding_index] }}</div>
                 <div class="formula_trees" v-bind:id="canvasID(property_hash, binding_index)"></div>
             </ul>
             </li>
@@ -393,7 +419,7 @@ Vue.component("visualisation", {
             <div class="col-sm-5">
                 <div class="panel panel-info">
                   <div class="panel-heading">Query</div>
-                  <div class="panel-body" id="query" v-html="this.store.current_specification">
+                  <div class="panel-body" id="query" v-html="store.current_specification">
                   </div>
                 </div>
 
@@ -401,11 +427,11 @@ Vue.component("visualisation", {
                   <div class="panel-heading">Code - <b>{{ store.current_function }}</b></div>
                   <div class="panel-body" id="code">
                     <table>
-                        <tr class="code-line-skip" v-if="this.currentCodeListing[0].number > 1">
+                        <tr class="code-line-skip" v-if="currentCodeListing[0].number > 1">
                             <td class="number"></td>
                             <td class="code-wrapper">...</td>
                         </tr>
-                        <tr class="code-line" v-for="line in this.currentCodeListing"
+                        <tr class="code-line" v-for="line in currentCodeListing"
                             v-bind:class="getLineHighlightStatus(line.number)">
                             <td class="number">{{ line.number }}</td>
                             <td class="code-wrapper"><pre class="code">{{ line.code }}</pre></td>
@@ -424,7 +450,7 @@ Vue.component("visualisation", {
                 </div>
 
                 <div class="panel panel-info">
-                  <div class="panel-heading">Formula Trees</div>
+                  <div class="panel-heading">Monitor Instances</div>
                   <div class="panel-body">
                     <formula-trees></formula-trees>
                   </div>

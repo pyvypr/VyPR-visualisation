@@ -7,3 +7,27 @@ div.formula_trees {
 div.formula_tree {
     margin: 5px;
 }
+
+div.formula-tree-list li {
+    list-style: none;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+div.formula-tree-list li ul {
+    font-size: 14px;
+    font-weight: normal;
+}
+
+div.formula-tree-list li div.property-hash {
+    background: #CCC;
+    padding: 5px;
+    width: 360px;
+}
+
+div.formula-tree-list li div.binding {
+    background: #CCC;
+    padding: 5px;
+    margin: 5px;
+    width: 160px;
+}
