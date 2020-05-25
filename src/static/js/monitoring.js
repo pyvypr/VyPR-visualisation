@@ -93,11 +93,13 @@ var apply_event = function(event, direction) {
             // add new formula tree element to DOM in next tick
             Vue.nextTick(function() {
                 var graph_div = document.createElement("div");
-                var graph_svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
+                var graph_svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
                 graph_svg.id = data.property_hash + "-" + data.binding_index + "-" + formula_tree_index;
                 graph_svg.innerHTML = "<g></g>";
                 $("#" + data.property_hash + "-" + data.binding_index).append(graph_div);
                 graph_div.append(graph_svg);
+                // render the formula tree
+                render_formula_tree(data.property_hash, data.binding_index, formula_tree_index);
             });
 
         } else if(event.action_to_perform == "receive-measurement") {
@@ -108,12 +110,10 @@ var apply_event = function(event, direction) {
                     // update the formula tree
                     // TODO: update to deal with mixed atoms
                     console.log("updating state of formula tree " + i);
-                    // get the formula tree
-                    var formula_tree = Store.formula_trees[i];
                     // update the value to which the relevant atom is mapped
                     Store.atom_lists[i][data.atom_index] = data.observed_value;
                     // update the formula tree with the values held in the atoms list
-                    formula_tree = interpret_formula_tree(formula_tree, Store.atom_lists[i]);
+                    interpret_formula_tree(Store.formula_trees[i], Store.atom_lists[i]);
                     // render the formula tree
                     render_formula_tree(data.property_hash, data.binding_index, i);
                 }
@@ -130,7 +130,8 @@ var interpret_formula_tree = function(formula_tree, atom_assignments) {
     if(formula_tree.type == "atom") {
         // replace the atom with the value held in the assignment
         formula_tree.value = atom_assignments[formula_tree.atom_index];
-        return formula_tree;
+        // mark the atom as evaluated
+        formula_tree.type = "evaluated";
     }
 };
 
@@ -165,11 +166,8 @@ var render_formula_tree = function(property_hash, binding_index, formula_tree_in
 
 var build_graph = function(graph, subtree) {
     // recursive through a formula tree, adding to the graph as we go
-    console.log("graph building case:");
-    console.log(subtree);
-    if(subtree.type == "atom") {
+    if(subtree.type == "atom" || subtree.type == "evaluated") {
         // TODO: update to deal with mixed atoms
-        console.log("adding to graph for atom");
         graph.setNode(
             subtree.atom_index,
             {label : subtree.value, width : subtree.value.length*5 + 10, height: 20}
