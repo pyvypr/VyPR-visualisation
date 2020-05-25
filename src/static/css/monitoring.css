@@ -1,0 +1,9 @@
+div.formula_trees {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+div.formula_tree {
+    margin: 5px;
+}

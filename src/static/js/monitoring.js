@@ -93,6 +93,7 @@ var apply_event = function(event, direction) {
             // add new formula tree element to DOM in next tick
             Vue.nextTick(function() {
                 var graph_div = document.createElement("div");
+                graph_div.className = "formula_tree";
                 var graph_svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
                 graph_svg.id = data.property_hash + "-" + data.binding_index + "-" + formula_tree_index;
                 graph_svg.innerHTML = "<g></g>";
@@ -160,8 +161,12 @@ var render_formula_tree = function(property_hash, binding_index, formula_tree_in
     // Run the renderer. This is what draws the final graph.
     render(inner, g);
 
-    svg.attr('height', g.graph().height + 40);
+    svg.attr('height', g.graph().height);
     svg.attr('width', g.graph().width);
+
+    // give correct size to parent formula tree wrapper
+    $("#" + property_hash + "-" + binding_index + "-" + formula_tree_index).parent().width(g.graph().width);
+    $("#" + property_hash + "-" + binding_index + "-" + formula_tree_index).parent().height(g.graph().height);
 };
 
 var build_graph = function(graph, subtree) {
