@@ -2,16 +2,16 @@ var Store = {
     events : [],
     id_to_event : {},
     selected_event_index : null,
-    highlighted_scfg_vertex : null,
     highlighted_line_number : null,
     highlighted_spec_variable : null,
     current_code_listing : [],
     current_function : null,
     most_recent_function_start_event_index : null,
-    // each binding tree is a list of vertices with ids and children
-    binding_trees : [],
-    play_interval : null,
-    instrumentation_tree : null
+    formula_trees : [],
+    atom_lists : [],
+    property_binding_maps : [],
+    most_recent_instrument_fired : null,
+    play_interval : null
 };
 
 var play = function() {
@@ -77,8 +77,103 @@ var apply_event = function(event, direction) {
     // direction is either "forwards" or "backwards" and affects how we apply the event
     // note: when we replay an event, we always assume that the existing state is immediately before
     // or after the event, since we cannot jump between events without applying each one in between.
+    var data = event.data;
     if(direction == "forwards") {
+        if(event.action_to_perform == "trigger-new-monitor") {
+            Store.most_recent_instrument_fired = event;
+            // add a new formula tree to the list of monitors
+            Store.formula_trees.push(data.formula_tree);
+            // set up a new assignment of atoms to observed values
+            Store.atom_lists.push(data.atoms);
+            // add a new property/binding pair so Vue can detect that
+            Store.property_binding_maps.push(
+                {property_hash : data.property_hash, binding_index : data.binding_index}
+            );
+            var formula_tree_index = Store.formula_trees.length-1;
+            // add new formula tree element to DOM in next tick
+            Vue.nextTick(function() {
+                var graph_div = document.createElement("div");
+                var graph_svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
+                graph_svg.id = data.property_hash + "-" + data.binding_index + "-" + formula_tree_index;
+                graph_svg.innerHTML = "<g></g>";
+                $("#" + data.property_hash + "-" + data.binding_index).append(graph_div);
+                graph_div.append(graph_svg);
+            });
+
+        } else if(event.action_to_perform == "receive-measurement") {
+            Store.most_recent_instrument_fired = event;
+            for(var i=0; i<Store.property_binding_maps.length; i++) {
+                if(Store.property_binding_maps[i].property_hash == data.property_hash &&
+                    Store.property_binding_maps[i].binding_index == data.binding_index) {
+                    // update the formula tree
+                    // TODO: update to deal with mixed atoms
+                    console.log("updating state of formula tree " + i);
+                    // get the formula tree
+                    var formula_tree = Store.formula_trees[i];
+                    // update the value to which the relevant atom is mapped
+                    Store.atom_lists[i][data.atom_index] = data.observed_value;
+                    // update the formula tree with the values held in the atoms list
+                    formula_tree = interpret_formula_tree(formula_tree, Store.atom_lists[i]);
+                    // render the formula tree
+                    render_formula_tree(data.property_hash, data.binding_index, i);
+                }
+            }
+        }
     } else if(direction == "backwards") {
+    }
+};
+
+var interpret_formula_tree = function(formula_tree, atom_assignments) {
+    // for a given set of atom assignments, recursively compute the version of the
+    // formula tree with atoms replaced by those assignments
+    console.log("interpreting formula tree with respect to assignment " + atom_assignments);
+    if(formula_tree.type == "atom") {
+        // replace the atom with the value held in the assignment
+        formula_tree.value = atom_assignments[formula_tree.atom_index];
+        return formula_tree;
+    }
+};
+
+var render_formula_tree = function(property_hash, binding_index, formula_tree_index) {
+    // render the formula tree at the given index that we have for the given property_hash/binding_index combination
+    // Note: the formula_tree_index given is the index in the global list of formula trees
+    // set up the svg container for the graph
+
+    // construct the graph
+    var g = new dagreD3.graphlib.Graph().setGraph({rankdir: 'LR'});
+    var formula_tree =  Store.formula_trees[formula_tree_index];
+
+    // we now recursively traverse the formula tree to add to the graph
+    build_graph(g, formula_tree);
+
+    // render the graph
+    var svg = d3.select("#" + property_hash + "-" + binding_index + "-" + formula_tree_index),
+    inner = svg.select("g");
+
+    // remove all content before rendering anything new
+    inner.selectAll("*").remove();
+
+    // Create the renderer
+    var render = new dagreD3.render();
+
+    // Run the renderer. This is what draws the final graph.
+    render(inner, g);
+
+    svg.attr('height', g.graph().height + 40);
+    svg.attr('width', g.graph().width);
+};
+
+var build_graph = function(graph, subtree) {
+    // recursive through a formula tree, adding to the graph as we go
+    console.log("graph building case:");
+    console.log(subtree);
+    if(subtree.type == "atom") {
+        // TODO: update to deal with mixed atoms
+        console.log("adding to graph for atom");
+        graph.setNode(
+            subtree.atom_index,
+            {label : subtree.value, width : subtree.value.length*5 + 10, height: 20}
+        );
     }
 };
 
@@ -200,6 +295,94 @@ Vue.component("timeline", {
     }
 });
 
+Vue.component("instrument-fired", {
+    template : `
+    <div class="instrument-fired">
+        <div v-if="instrumentHasFired">
+            <div v-if="mostRecentInstrument.action_to_perform == 'trigger-new-monitor'">
+                <p><b>Trigger for a new monitor</b></p>
+                <p><b>Property hash:</b> {{ mostRecentInstrument.data.property_hash }}</p>
+                <p><b>Index of binding:</b> {{ mostRecentInstrument.data.binding_index }}</p>
+                <p><b>Observed values to copy:</b>
+                 {{ mostRecentInstrument.data.observed_values }}</p>
+                <p><b>Variable index:</b> {{ mostRecentInstrument.data.variable_index }}</p>
+            </div>
+            <div v-else-if="mostRecentInstrument.action_to_perform == 'receive-measurement'">
+                <p><b>Update a monitor with a measurement</b></p>
+                <p><b>Property hash:</b> {{ mostRecentInstrument.data.property_hash }}</p>
+                <p><b>Index of binding:</b> {{ mostRecentInstrument.data.binding_index }}</p>
+                <p><b>Atom and sub-atom indices:</b> {{ mostRecentInstrument.data.atom_index }},
+                {{ mostRecentInstrument.data.atom_sub_index }}</p>
+                <p><b>Measurement </b>
+                 {{ mostRecentInstrument.data.observed_value }}<b> starting from </b>
+                 {{ mostRecentInstrument.data.observation_start_time }}<b> and ending at </b>
+                 {{ mostRecentInstrument.data.observation_end_time }}</p>
+            </div>
+        </div>
+        <div v-else>
+            <p>No instrument has fired yet.</p>
+        </div>
+    </div>
+    `,
+    data : function() {
+        return {
+            store : Store
+        }
+    },
+    computed : {
+        instrumentHasFired : function() {
+            return this.store.most_recent_instrument_fired != null;
+        },
+        mostRecentInstrument : function() {
+            return this.store.most_recent_instrument_fired;
+        }
+    }
+});
+
+Vue.component("formula-trees", {
+    template : `
+    <div class="formula-tree-list">
+        <ul v-for="(binding_index_list, property_hash) in this.monitorTree">
+            <li>
+            {{ property_hash }}
+            <ul v-for="binding_index in binding_index_list">
+                <p>Binding {{ binding_index }}</p>
+                <div class="formula_trees" v-bind:id="canvasID(property_hash, binding_index)"></div>
+            </ul>
+            </li>
+        </ul>
+    </div>
+    `,
+    data : function() {
+        return {
+            store : Store
+        };
+    },
+    methods : {
+        canvasID : function(property_hash, binding_index) {
+            return property_hash + "-" + binding_index;
+        }
+    },
+    computed : {
+        monitorTree : function() {
+            var tree = {};
+            for(var index in Store.property_binding_maps) {
+                var property_hash = Store.property_binding_maps[index].property_hash;
+                var binding_index = Store.property_binding_maps[index].binding_index;
+                if(!(property_hash in tree)) {
+                    tree[property_hash] = [binding_index];
+                } else {
+                    if(!(binding_index in tree[property_hash])) {
+                        tree[property_hash].push(binding_index);
+                    }
+                }
+            }
+            return tree;
+        },
+
+    }
+});
+
 Vue.component("visualisation", {
     template : `
     <div id="visualisation" class="container-fluid">
@@ -207,7 +390,7 @@ Vue.component("visualisation", {
             <div class="col-sm-5">
                 <div class="panel panel-info">
                   <div class="panel-heading">Query</div>
-                  <div class="panel-body" id="query" v-html="store.current_specification">
+                  <div class="panel-body" id="query" v-html="this.store.current_specification">
                   </div>
                 </div>
 
@@ -233,12 +416,14 @@ Vue.component("visualisation", {
                 <div class="panel panel-info">
                   <div class="panel-heading">Most Recent Instrument Fired</div>
                   <div class="panel-body">
+                    <instrument-fired></instrument-fired>
                   </div>
                 </div>
 
                 <div class="panel panel-info">
                   <div class="panel-heading">Formula Trees</div>
                   <div class="panel-body">
+                    <formula-trees></formula-trees>
                   </div>
                 </div>
             </div>

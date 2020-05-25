@@ -19,12 +19,14 @@
     <visualisation></visualisation>
 </div>
 
-<!-- Vue.js for main operations, axios for http and dagre/d3 for graphs. -->
+<!-- Vue.js for main operations, axios for http, dagre/d3 for graphs, bootstrap/jquery for some UI. -->
 <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
 <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 <script src="https://d3js.org/d3.v5.min.js"></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/dagre-d3.js') }}"></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/monitoring.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/jquery-3.5.0.min.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/bootstrap.min.js') }}"></script>
 
 </body>
 </html>
