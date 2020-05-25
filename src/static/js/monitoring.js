@@ -14,6 +14,26 @@ var Store = {
     play_interval : null
 };
 
+var reset_store = function(store) {
+    Store.selected_event_index = null;
+    Store.highlighted_line_number = null;
+    Store.highlighted_spec_variable = null;
+    Store.current_code_listing = [];
+    Store.current_function = null;
+    Store.most_recent_function_start_event_index = null;
+    // delete from the formula trees list
+    //Store.formula_trees.splice(0, Store.formula_trees.length);
+    Store.formula_trees = [];
+    // delete from the list of atom lists
+    //Store.atom_lists.splice(0, Store.atom_lists.length);
+    Store.atom_lists = [];
+    // delete from the maps list
+    //Store.property_binding_maps.splice(0, Store.property_binding_maps.length);
+    Store.property_binding_maps = [];
+    Store.most_recent_instrument_fired = null;
+    Store.play_interval = null;
+};
+
 var play = function() {
     // this is only ever set inside an interval
     // advance events by replaying from current position onwards.
@@ -63,36 +83,46 @@ var replay_events = function(start_index, end_index) {
     if(start_index < end_index) {
         // replay forwards in time
         for(var i=start_index+1; i<=end_index; i++) {
-            apply_event(Store.events[i], "forwards");
+            apply_event(Store.events[i]);
         }
     } else if(start_index > end_index) {
         // replay backwards in time
-        for(var i=start_index; i>end_index; i--) {
-            apply_event(Store.events[i], "backwards");
+        // to do this, we determine the previous event, wipe the state and then replay from the start
+        // to the previous event
+        console.log("...replaying from start");
+        reset_store();
+        console.log("...with store...")
+        console.log(Store.formula_trees);
+        console.log(Store.atom_lists);
+        select_event(end_index);
+        for(var i=1; i<=end_index; i++) {
+            apply_event(Store.events[i]);
         }
     }
 };
 
-var apply_event = function(event, direction) {
+var apply_event = function(event) {
     // event is a dictionary with an action and data
-    // direction is either "forwards" or "backwards" and affects how we apply the event
-    // note: when we replay an event, we always assume that the existing state is immediately before
-    // or after the event, since we cannot jump between events without applying each one in between.
+    // direction is always forwards for monitoring because information is often deleted so to reconstruct it
+    // we have to replay the whole monitoring process.
     var data = event.data;
-    if(direction == "forwards") {
-        if(event.action_to_perform == "trigger-new-monitor") {
-            Store.most_recent_instrument_fired = event;
-            // add a new formula tree to the list of monitors
-            Store.formula_trees.push(data.formula_tree);
-            // set up a new assignment of atoms to observed values
-            Store.atom_lists.push(data.atoms);
-            // add a new property/binding pair so Vue can detect that
-            Store.property_binding_maps.push(
-                {property_hash : data.property_hash, binding_index : data.binding_index}
-            );
-            var formula_tree_index = Store.formula_trees.length-1;
-            // add new formula tree element to DOM in next tick
-            Vue.nextTick(function() {
+    if(event.action_to_perform == "trigger-new-monitor") {
+        console.log("trigger new monitor");
+        Store.most_recent_instrument_fired = event;
+        // add a new formula tree to the list of monitors by copy
+        formula_tree_copy = JSON.parse(JSON.stringify(data.formula_tree));
+        Store.formula_trees.push(formula_tree_copy);
+        // set up a new assignment of atoms to observed values by copy
+        Store.atom_lists.push(data.atoms.slice());
+        // add a new property/binding pair so Vue can detect that
+        Store.property_binding_maps.push(
+            {property_hash : data.property_hash, binding_index : data.binding_index}
+        );
+        var formula_tree_index = Store.formula_trees.length-1;
+        // add new formula tree element to DOM in next tick
+        Vue.nextTick(function() {
+            if($("#" + data.property_hash + "-" + data.binding_index + "-" + formula_tree_index).length == 0) {
+                // if the formula tree wasn't found, put it on the page
                 var graph_div = document.createElement("div");
                 graph_div.className = "formula_tree";
                 var graph_svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -100,50 +130,49 @@ var apply_event = function(event, direction) {
                 graph_svg.innerHTML = "<g></g>";
                 $("#" + data.property_hash + "-" + data.binding_index).append(graph_div);
                 graph_div.append(graph_svg);
-                // render the formula tree
-                render_formula_tree(data.property_hash, data.binding_index, formula_tree_index);
-            });
+            }
+            // render the formula tree
+            render_formula_tree(data.property_hash, data.binding_index, formula_tree_index);
+        });
 
-        } else if(event.action_to_perform == "receive-measurement") {
-            Store.most_recent_instrument_fired = event;
-            for(var i=0; i<Store.property_binding_maps.length; i++) {
-                if(Store.property_binding_maps[i].property_hash == data.property_hash &&
-                    Store.property_binding_maps[i].binding_index == data.binding_index) {
-                    // update the formula tree
-                    // TODO: update to deal with mixed atoms
-                    console.log("updating state of formula tree " + i);
-                    // update the value to which the relevant atom is mapped
-                    Store.atom_lists[i][data.atom_index] = data.observed_value;
-                    // update the formula tree with the values held in the atoms list
-                    interpret_formula_tree(Store.formula_trees[i], Store.atom_lists[i]);
-                    // render the formula tree
-                    render_formula_tree(data.property_hash, data.binding_index, i);
-                }
+    } else if(event.action_to_perform == "receive-measurement") {
+        Store.most_recent_instrument_fired = event;
+        for(var i=0; i<Store.property_binding_maps.length; i++) {
+            if(Store.property_binding_maps[i].property_hash == data.property_hash &&
+                Store.property_binding_maps[i].binding_index == data.binding_index) {
+                // update the formula tree
+                // TODO: update to deal with mixed atoms
+                console.log("updating state of formula tree " + i);
+                // update the value to which the relevant atom is mapped
+                Store.atom_lists[i][data.atom_index] = data.observed_value;
+                // update the formula tree with the values held in the atoms list
+                interpret_formula_tree(Store.formula_trees[i], Store.atom_lists[i]);
+                // render the formula tree
+                render_formula_tree(data.property_hash, data.binding_index, i);
             }
-        } else if(event.action_to_perform == "collapse-monitor") {
-            alert("processing collapse monitor event");
-            // the formula tree index given by VyPR is local to the property/binding pair,
-            // so we have to iterate through the global list and keep a count to determine which
-            // formula tree corresponds to the local index given
-            var local_count = 0;
-            for(var i=0; i<Store.property_binding_maps.length; i++) {
-                if(Store.property_binding_maps[i].property_hash == data.property_hash &&
-                    Store.property_binding_maps[i].binding_index == data.binding_index) {
-                    if(local_count == data.formula_tree_index) {
-                        Store.formula_trees[i].verdict = data.verdict;
-                        var global_formula_tree_index = i;
-                    } else {
-                        local_count++;
-                    }
-                }
-            }
-            Vue.nextTick(function () {
-                // add the verdict to the relevant formula tree container
-                $("#" + data.property_hash + "-" + data.binding_index + "-" + global_formula_tree_index)
-                    .parent().html("<div class='verdict'>" + data.verdict + "</div>");
-            });
         }
-    } else if(direction == "backwards") {
+    } else if(event.action_to_perform == "collapse-monitor") {
+        Store.most_recent_instrument_fired = event;
+        // the formula tree index given by VyPR is local to the property/binding pair,
+        // so we have to iterate through the global list and keep a count to determine which
+        // formula tree corresponds to the local index given
+        var local_count = 0;
+        for(var i=0; i<Store.property_binding_maps.length; i++) {
+            if(Store.property_binding_maps[i].property_hash == data.property_hash &&
+                Store.property_binding_maps[i].binding_index == data.binding_index) {
+                if(local_count == data.formula_tree_index) {
+                    Store.formula_trees[i].verdict = data.verdict;
+                    var global_formula_tree_index = i;
+                } else {
+                    local_count++;
+                }
+            }
+        }
+        Vue.nextTick(function () {
+            // add the verdict to the relevant formula tree container
+            $("#" + data.property_hash + "-" + data.binding_index + "-" + global_formula_tree_index)
+                .parent().append("<div class='verdict'>" + data.verdict + "</div>");
+        });
     }
 };
 
@@ -290,14 +319,14 @@ Vue.component("timeline", {
             if(this.store.selected_event_index < this.store.events.length-1 && this.store.play_interval == null) {
                 this.store.selected_event_index++;
                 select_event(this.store.selected_event_index);
-                apply_event(this.store.events[this.store.selected_event_index], "forwards");
+                apply_event(this.store.events[this.store.selected_event_index]);
             }
         },
         handlerPreviousEvent : function(e) {
             if(this.store.selected_event_index != 0 && this.store.play_interval == null) {
-                select_event(this.store.selected_event_index);
-                apply_event(this.store.events[this.store.selected_event_index], "backwards");
-                this.store.selected_event_index--;
+                var previous_event_index = this.store.selected_event_index;
+                select_event(this.store.selected_event_index-1);
+                replay_events(previous_event_index, this.store.selected_event_index);
             }
         }
     },
@@ -343,6 +372,13 @@ Vue.component("instrument-fired", {
                  {{ mostRecentInstrument.data.observed_value }}<b> starting from </b>
                  {{ mostRecentInstrument.data.observation_start_time }}<b> and ending at </b>
                  {{ mostRecentInstrument.data.observation_end_time }}</p>
+            </div>
+            <div v-else-if="mostRecentInstrument.action_to_perform == 'collapse-monitor'">
+                <p><b>Collapse a monitor to a verdict</b></p>
+                <p><b>Property hash:</b> {{ mostRecentInstrument.data.property_hash }}</p>
+                <p><b>Index of binding:</b> {{ mostRecentInstrument.data.binding_index }}</p>
+                <p><b>Formula tree local index:</b> {{ mostRecentInstrument.data.formula_tree_index }}</p>
+                <p><b>Verdict: </b> {{ mostRecentInstrument.data.verdict }}</p>
             </div>
         </div>
         <div v-else>
