@@ -89,11 +89,7 @@ var replay_events = function(start_index, end_index) {
         // replay backwards in time
         // to do this, we determine the previous event, wipe the state and then replay from the start
         // to the previous event
-        console.log("...replaying from start");
         reset_store();
-        console.log("...with store...")
-        console.log(Store.formula_trees);
-        console.log(Store.atom_lists);
         select_event(end_index);
         for(var i=1; i<=end_index; i++) {
             apply_event(Store.events[i]);
@@ -107,7 +103,6 @@ var apply_event = function(event) {
     // we have to replay the whole monitoring process.
     var data = event.data;
     if(event.action_to_perform == "trigger-new-monitor") {
-        console.log("trigger new monitor");
         Store.most_recent_instrument_fired = event;
         // add a new formula tree to the list of monitors by copy
         formula_tree_copy = JSON.parse(JSON.stringify(data.formula_tree));
@@ -118,9 +113,26 @@ var apply_event = function(event) {
         Store.property_binding_maps.push(
             {property_hash : data.property_hash, binding_index : data.binding_index}
         );
+        console.log(Store.property_binding_maps);
         var formula_tree_index = Store.formula_trees.length-1;
+        // check whether this formula tree is the first for this binding
+        var n_formula_trees = 0;
+        for(var i=0; i<Store.property_binding_maps.length; i++) {
+            if(Store.property_binding_maps[i].property_hash == data.property_hash &&
+                Store.property_binding_maps[i].binding_index == data.binding_index) {
+                n_formula_trees++;
+            }
+        }
+        console.log(n_formula_trees + " found for binding " + data.binding_index);
         // add new formula tree element to DOM in next tick
         Vue.nextTick(function() {
+            // if this is the first formula tree, first remove all existing content (we need to do this
+            // if we're going backwards)
+            if(n_formula_trees == 1) {
+                console.log("adding first formula tree");
+                $("#" + data.property_hash + "-" + data.binding_index).empty();
+            }
+            // if the formula tree doesn't exist, add it
             if($("#" + data.property_hash + "-" + data.binding_index + "-" + formula_tree_index).length == 0) {
                 // if the formula tree wasn't found, put it on the page
                 var graph_div = document.createElement("div");
@@ -129,6 +141,7 @@ var apply_event = function(event) {
                 graph_svg.id = data.property_hash + "-" + data.binding_index + "-" + formula_tree_index;
                 graph_svg.innerHTML = "<g></g>";
                 $("#" + data.property_hash + "-" + data.binding_index).append(graph_div);
+                console.log("adding formula tree to end");
                 graph_div.append(graph_svg);
             }
             // render the formula tree
@@ -142,7 +155,6 @@ var apply_event = function(event) {
                 Store.property_binding_maps[i].binding_index == data.binding_index) {
                 // update the formula tree
                 // TODO: update to deal with mixed atoms
-                console.log("updating state of formula tree " + i);
                 // update the value to which the relevant atom is mapped
                 Store.atom_lists[i][data.atom_index] = data.observed_value;
                 // update the formula tree with the values held in the atoms list
@@ -170,8 +182,9 @@ var apply_event = function(event) {
         }
         Vue.nextTick(function () {
             // add the verdict to the relevant formula tree container
+            console.log(data.verdict);
             $("#" + data.property_hash + "-" + data.binding_index + "-" + global_formula_tree_index)
-                .parent().append("<div class='verdict'>" + data.verdict + "</div>");
+                .parent().addClass(String(data.verdict));
         });
     }
 };
@@ -179,7 +192,6 @@ var apply_event = function(event) {
 var interpret_formula_tree = function(formula_tree, atom_assignments) {
     // for a given set of atom assignments, recursively compute the version of the
     // formula tree with atoms replaced by those assignments
-    console.log("interpreting formula tree with respect to assignment " + atom_assignments);
     if(formula_tree.type == "atom") {
         // replace the atom with the value held in the assignment
         formula_tree.value = atom_assignments[formula_tree.atom_index];
@@ -326,6 +338,7 @@ Vue.component("timeline", {
             if(this.store.selected_event_index != 0 && this.store.play_interval == null) {
                 var previous_event_index = this.store.selected_event_index;
                 select_event(this.store.selected_event_index-1);
+                console.log([previous_event_index, this.store.selected_event_index]);
                 replay_events(previous_event_index, this.store.selected_event_index);
             }
         }

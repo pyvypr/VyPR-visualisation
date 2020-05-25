@@ -6,6 +6,15 @@ div.formula_trees {
 
 div.formula_tree {
     margin: 5px;
+    border: white 2px solid;
+}
+
+div.formula_tree.true {
+    border: green 2px solid;
+}
+
+div.formula_tree.false {
+    border: red 2px solid;
 }
 
 div.formula-tree-list li {
@@ -30,11 +39,4 @@ div.formula-tree-list li div.binding {
     padding: 5px;
     margin: 5px;
     width: 160px;
-}
-
-div.verdict {
-    margin: 5px;
-    padding: 5px;
-    font-weight: bold;
-    text-align: center;
 }
