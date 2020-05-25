@@ -121,6 +121,7 @@ var apply_event = function(event, direction) {
                 }
             }
         } else if(event.action_to_perform == "collapse-monitor") {
+            alert("processing collapse monitor event");
             // the formula tree index given by VyPR is local to the property/binding pair,
             // so we have to iterate through the global list and keep a count to determine which
             // formula tree corresponds to the local index given
@@ -130,11 +131,17 @@ var apply_event = function(event, direction) {
                     Store.property_binding_maps[i].binding_index == data.binding_index) {
                     if(local_count == data.formula_tree_index) {
                         Store.formula_trees[i].verdict = data.verdict;
+                        var global_formula_tree_index = i;
                     } else {
                         local_count++;
                     }
                 }
             }
+            Vue.nextTick(function () {
+                // add the verdict to the relevant formula tree container
+                $("#" + data.property_hash + "-" + data.binding_index + "-" + global_formula_tree_index)
+                    .parent().html("<div class='verdict'>" + data.verdict + "</div>");
+            });
         }
     } else if(direction == "backwards") {
     }
@@ -183,16 +190,6 @@ var render_formula_tree = function(property_hash, binding_index, formula_tree_in
     // give correct size to parent formula tree wrapper
     $("#" + property_hash + "-" + binding_index + "-" + formula_tree_index).parent().width(g.graph().width);
     $("#" + property_hash + "-" + binding_index + "-" + formula_tree_index).parent().height(g.graph().height);
-
-    // set the border of the parent to indicate verdict
-    verdict_class_map = {
-        "None" : "inconclusive",
-        "True" : "true",
-        "False" : "false"
-    };
-    $("#" + property_hash + "-" + binding_index + "-" + formula_tree_index).parent().addClass(
-        verdict_class_map[formula_tree.verdict]
-    );
 };
 
 var build_graph = function(graph, subtree) {

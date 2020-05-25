@@ -31,3 +31,10 @@ div.formula-tree-list li div.binding {
     margin: 5px;
     width: 160px;
 }
+
+div.verdict {
+    margin: 5px;
+    padding: 5px;
+    font-weight: bold;
+    text-align: center;
+}
