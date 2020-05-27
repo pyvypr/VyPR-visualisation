@@ -6,6 +6,7 @@ var Store = {
     highlighted_spec_variable : null,
     current_code_listing : [],
     current_function : null,
+    variables : [],
     most_recent_function_start_event_index : null,
     formula_trees : [],
     atom_lists : [],
@@ -65,6 +66,7 @@ var select_event = function(index) {
     var function_begin_event = Store.events[begin_function_event_index];
     Store.current_code_listing = function_begin_event.data.code;
     Store.current_specification = function_begin_event.data.specification;
+    Store.current_variables = function_begin_event.data.variables;
     Store.current_bindings = function_begin_event.data.bindings;
     // check if the function has been changed
     var function_changed =
@@ -147,6 +149,8 @@ var apply_event = function(event) {
             // render the formula tree
             render_formula_tree(data.property_hash, data.binding_index, formula_tree_index);
         });
+        // finally, highlight the triggering line number in the source code
+        Store.highlighted_line_number = Store.current_bindings[data.binding_index][data.variable_index]
 
     } else if(event.action_to_perform == "receive-measurement") {
         Store.most_recent_instrument_fired = event;
@@ -370,15 +374,20 @@ Vue.component("instrument-fired", {
             <div v-if="mostRecentInstrument.action_to_perform == 'trigger-new-monitor'">
                 <p><b>Trigger for a new monitor</b></p>
                 <p><b>Property hash:</b> {{ mostRecentInstrument.data.property_hash }}</p>
-                <p><b>Index of binding:</b> {{ mostRecentInstrument.data.binding_index }}</p>
+                <p><b>Generating source code line:</b>
+                {{ store.current_bindings[mostRecentInstrument.data.binding_index]
+                    [mostRecentInstrument.data.variable_index] }}
+                </p>
                 <p><b>Observed values to copy:</b>
                  {{ mostRecentInstrument.data.observed_values }}</p>
-                <p><b>Variable index:</b> {{ mostRecentInstrument.data.variable_index }}</p>
+                <p><b>Variable:</b> {{ store.current_variables[mostRecentInstrument.data.variable_index] }}</p>
             </div>
             <div v-else-if="mostRecentInstrument.action_to_perform == 'receive-measurement'">
                 <p><b>Update a monitor with a measurement</b></p>
                 <p><b>Property hash:</b> {{ mostRecentInstrument.data.property_hash }}</p>
-                <p><b>Index of binding:</b> {{ mostRecentInstrument.data.binding_index }}</p>
+                <p><b>Relevant source code lines:</b>
+                {{ store.current_bindings[mostRecentInstrument.data.binding_index] }}
+                </p>
                 <p><b>Atom and sub-atom indices:</b> {{ mostRecentInstrument.data.atom_index }},
                 {{ mostRecentInstrument.data.atom_sub_index }}</p>
                 <p><b>Measurement </b>
