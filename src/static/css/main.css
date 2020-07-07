@@ -103,3 +103,33 @@ div.left-column {
 .node .label {
     color: black;
 }
+
+a.badge {
+    float: right;
+    transition: border-radius 0.5s;
+}
+
+a.badge:hover {
+    background: black!important;
+}
+
+a.badge.active {
+    background: black!important;
+    border-radius: 10px 10px 0px 0px!important;
+    transition: border-radius 0.5s;
+}
+
+.info-panel {
+    font-size: 12px;
+    background: black;
+    color: white;
+    position: absolute;
+    display: none;
+    overflow: hidden;
+    overflow-y: scroll;
+    border-radius: 5px 0px 5px 5px;
+    padding: 10px;
+    margin-top: -28px;
+    width: 500px;
+    height: 170px;
+}

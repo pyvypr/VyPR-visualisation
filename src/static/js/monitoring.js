@@ -372,19 +372,40 @@ Vue.component("instrument-fired", {
     <div class="instrument-fired">
         <div v-if="instrumentHasFired">
             <div v-if="mostRecentInstrument.action_to_perform == 'trigger-new-monitor'">
+                <div class="info-panel">
+                    <p>VyPR places additional code in a monitored program in order to get the data it needs
+                    to resolve the query given by an engineer.</p>
+                    <p>This instrument has told VyPR that it should instantiate a new formula tree whose
+                    structure reflects the quantifier-free part of the query given.</p>
+                    <p v-if="mostRecentInstrument.data.variable_index == 0">In this case, a clean monitor will be instantiated
+                    since the instrument was placed for the first variable.</p>
+                    <p v-else>In this case, a monitor will be instantiated by copying state from existing monitors
+                    since the instrument was placed for a variable that was not the first, so there may have been
+                    information observed for previous variables.</p>
+                </div>
+
                 <p><b>Trigger for a new monitor</b></p>
-                <p><b>Property hash:</b> {{ mostRecentInstrument.data.property_hash }}</p>
+                <!--<p><b>Property hash:</b> {{ mostRecentInstrument.data.property_hash }}</p>-->
                 <p><b>Generating source code line:</b>
                 {{ store.current_bindings[mostRecentInstrument.data.binding_index]
                     [mostRecentInstrument.data.variable_index] }}
                 </p>
                 <p><b>Observed values to copy:</b>
                  {{ mostRecentInstrument.data.observed_values }}</p>
-                <p><b>Variable:</b> {{ store.current_variables[mostRecentInstrument.data.variable_index] }}</p>
+                <p><b>Variable matched:</b> {{ store.current_variables[mostRecentInstrument.data.variable_index] }}</p>
             </div>
             <div v-else-if="mostRecentInstrument.action_to_perform == 'receive-measurement'">
+
+                <div class="info-panel">
+                    <p>VyPR places additional code in a monitored program in order to get the data it needs
+                    to resolve the query given by an engineer.</p>
+                    <p>This instrument has given VyPR a measurement with which to update existing monitors.  The instrument
+                    received also included information on 1) which formula trees to update and 2) which parts of them to update.
+                    This removes the need for the monitoring algorithm to perform its own lookup.</p>
+                </div>
+
                 <p><b>Update a monitor with a measurement</b></p>
-                <p><b>Property hash:</b> {{ mostRecentInstrument.data.property_hash }}</p>
+                <!--<p><b>Property hash:</b> {{ mostRecentInstrument.data.property_hash }}</p>-->
                 <p><b>Relevant source code lines:</b>
                 {{ store.current_bindings[mostRecentInstrument.data.binding_index] }}
                 </p>
@@ -396,8 +417,16 @@ Vue.component("instrument-fired", {
                  {{ mostRecentInstrument.data.observation_end_time }}</p>
             </div>
             <div v-else-if="mostRecentInstrument.action_to_perform == 'collapse-monitor'">
+
+                <div class="info-panel">
+                    <p>VyPR places additional code in a monitored program in order to get the data it needs
+                    to resolve the query given by an engineer.</p>
+                    <p>When enough information is received from the program to conclude that the constraint expressed by
+                    a formula tree is satisfied or not, that formula tree is collapsed to the representative truth value.</p>
+                </div>
+
                 <p><b>Collapse a monitor to a verdict</b></p>
-                <p><b>Property hash:</b> {{ mostRecentInstrument.data.property_hash }}</p>
+                <!--<p><b>Property hash:</b> {{ mostRecentInstrument.data.property_hash }}</p>-->
                 <p><b>Index of binding:</b> {{ mostRecentInstrument.data.binding_index }}</p>
                 <p><b>Formula tree local index:</b> {{ mostRecentInstrument.data.formula_tree_index }}</p>
                 <p><b>Verdict: </b> {{ mostRecentInstrument.data.verdict }}</p>
@@ -426,6 +455,13 @@ Vue.component("instrument-fired", {
 Vue.component("formula-trees", {
     template : `
     <div class="formula-tree-list">
+        <div class="info-panel">
+            <p>The current state held by the monitoring algorithm.</p>
+            <p>Each pair of events matching the quantifiers in the query generates a <i>formula tree</i>
+            here.  Formula trees are grouped by the pairs of statements in code that generated
+            the relevant events.</p>
+            <p>As measurements are received from instruments, the formula trees collapse to truth values.</p>
+        </div>
         <p v-if="monitorTreeEmpty">
             No monitoring state exists yet.
         </p>
@@ -485,8 +521,16 @@ Vue.component("visualisation", {
                 </div>
 
                 <div class="panel panel-info">
-                  <div class="panel-heading">Code - <b>{{ store.current_function }}</b></div>
+                  <div class="panel-heading">
+                    Code - <b>{{ store.current_function }}</b>
+                    <a class="badge" @click="showInfo($event)">?</a>
+                  </div>
                   <div class="panel-body" id="code">
+                    <div class="info-panel">
+                      <p>The function in source code that was monitored by VyPR at runtime.</p>
+                      <p>As monitoring progresses, the statements at which measurements were made at runtime
+                      are highlighted here.</p>
+                    </div>
                     <table>
                         <tr class="code-line-skip" v-if="currentCodeListing[0].number > 1">
                             <td class="number"></td>
@@ -504,14 +548,20 @@ Vue.component("visualisation", {
 
             <div class="col-sm-7">
                 <div class="panel panel-info">
-                  <div class="panel-heading">Most Recent Instrument Fired</div>
+                  <div class="panel-heading">
+                    Most Recent Instrument Fired
+                    <a class="badge" @click="showInfo($event)">?</a>
+                  </div>
                   <div class="panel-body">
                     <instrument-fired></instrument-fired>
                   </div>
                 </div>
 
                 <div class="panel panel-info">
-                  <div class="panel-heading">Monitor Instances</div>
+                  <div class="panel-heading">
+                    Monitor Instances
+                    <a class="badge" @click="showInfo($event)">?</a>
+                  </div>
                   <div class="panel-body">
                     <formula-trees></formula-trees>
                   </div>
@@ -541,6 +591,14 @@ Vue.component("visualisation", {
             if(Store.highlighted_line_number == line_number) {
                 return "highlighted";
             } else return ""
+        },
+        showInfo : function(e) {
+          $(e.target).toggleClass("active");
+          var info_panel = $(e.target).parent().parent().find(".info-panel");
+          info_panel.fadeToggle();
+          info_panel.css({
+            "margin-left" : ($(e.target).parent().parent().outerWidth()-info_panel.outerWidth()-32) + "px"
+          });
         }
     }
 });
