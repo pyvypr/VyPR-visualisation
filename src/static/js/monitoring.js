@@ -523,7 +523,7 @@ Vue.component("visualisation", {
                 <div class="panel panel-info">
                   <div class="panel-heading">
                     Code - <b>{{ store.current_function }}</b>
-                    <a class="badge" @click="showInfo($event)">?</a>
+                    <a class="badge" @mouseover="toggleInfo($event)" @mouseout="toggleInfo($event)">?</a>
                   </div>
                   <div class="panel-body" id="code">
                     <div class="info-panel">
@@ -550,7 +550,7 @@ Vue.component("visualisation", {
                 <div class="panel panel-info">
                   <div class="panel-heading">
                     Most Recent Instrument Fired
-                    <a class="badge" @click="showInfo($event)">?</a>
+                    <a class="badge" @mouseover="toggleInfo($event)" @mouseout="toggleInfo($event)">?</a>
                   </div>
                   <div class="panel-body">
                     <instrument-fired></instrument-fired>
@@ -560,7 +560,7 @@ Vue.component("visualisation", {
                 <div class="panel panel-info">
                   <div class="panel-heading">
                     Monitor Instances
-                    <a class="badge" @click="showInfo($event)">?</a>
+                    <a class="badge" @mouseover="toggleInfo($event)" @mouseout="toggleInfo($event)">?</a>
                   </div>
                   <div class="panel-body">
                     <formula-trees></formula-trees>
@@ -592,7 +592,7 @@ Vue.component("visualisation", {
                 return "highlighted";
             } else return ""
         },
-        showInfo : function(e) {
+        toggleInfo : function(e) {
           $(e.target).toggleClass("active");
           var info_panel = $(e.target).parent().parent().find(".info-panel");
           info_panel.fadeToggle();
