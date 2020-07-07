@@ -38,5 +38,6 @@ div.formula-tree-list li div.binding {
     background: #CCC;
     padding: 5px;
     margin: 5px;
-    width: 160px;
+    width: 300px;
+    text-align: center;
 }

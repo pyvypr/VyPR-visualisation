@@ -466,12 +466,9 @@ Vue.component("formula-trees", {
             No monitoring state exists yet.
         </p>
         <ul v-else v-for="(binding_index_list, property_hash) in monitorTree">
-            <li>
-            <div class="property-hash">{{ property_hash }}</div>
-            <ul v-for="binding_index in binding_index_list">
-                <div class="binding">Binding - lines {{ store.current_bindings[binding_index] }}</div>
+            <li v-for="binding_index in binding_index_list">
+                <div class="binding">Monitors triggered by lines {{ store.current_bindings[binding_index] }}</div>
                 <div class="formula_trees" v-bind:id="canvasID(property_hash, binding_index)"></div>
-            </ul>
             </li>
         </ul>
     </div>
