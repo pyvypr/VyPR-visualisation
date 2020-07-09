@@ -59,6 +59,33 @@ div.left-column {
 
 .panel-body#query {
     font-family: courier;
+    cursor: default;
+}
+
+.list-group-item-text.code {
+    padding: 5px;
+}
+
+.tooltip {
+    background: black;
+    color: white;
+    padding: 5px;
+    border-radius: 5px 5px 5px 5px;
+    margin-top: -20px;
+    margin-left: 400px;
+    width: 200px;
+}
+
+div:hover > .tooltip, span:hover > .tooltip {
+    display: block;
+    opacity: 1;
+    transition: opacity 1s;
+}
+
+.atom {
+    background: lightgrey;
+    padding: 5px;
+    border-radius: 5px 5px 5px 5px;
 }
 
 .panel-body#code pre {

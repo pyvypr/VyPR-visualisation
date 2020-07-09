@@ -532,7 +532,7 @@ Vue.component("visualisation", {
     template : `
     <div id="visualisation" class="container-fluid">
         <div class="vis-on" v-if="dataReady">
-            <div class="col-sm-3">
+            <div class="col-sm-4">
                 <div class="panel panel-info">
                   <div class="panel-heading">Query</div>
                   <div class="panel-body" id="query" v-html="store.current_specification">
@@ -546,7 +546,7 @@ Vue.component("visualisation", {
                 </div>
             </div>
 
-            <div class="col-sm-5">
+            <div class="col-sm-4">
 
                 <div class="panel panel-info">
                   <div class="panel-heading">Code - <b>{{ store.current_function }}</b></div>
