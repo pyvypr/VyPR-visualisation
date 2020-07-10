@@ -145,6 +145,10 @@ var apply_event = function(event) {
                 $("#" + data.property_hash + "-" + data.binding_index).append(graph_div);
                 console.log("adding formula tree to end");
                 graph_div.append(graph_svg);
+                // add verdict panel
+                var verdict_panel = document.createElement("div");
+                verdict_panel.className = "verdict";
+                graph_div.append(verdict_panel);
             }
             // render the formula tree
             render_formula_tree(data.property_hash, data.binding_index, formula_tree_index);
@@ -157,12 +161,19 @@ var apply_event = function(event) {
         for(var i=0; i<Store.property_binding_maps.length; i++) {
             if(Store.property_binding_maps[i].property_hash == data.property_hash &&
                 Store.property_binding_maps[i].binding_index == data.binding_index) {
-                // update the formula tree
-                // TODO: update to deal with mixed atoms
                 // update the value to which the relevant atom is mapped
-                Store.atom_lists[i][data.atom_index] = data.observed_value;
+                if(Store.formula_trees[i].type == "mixed-atom") {
+                    Store.atom_lists[i][data.atom_index][data.atom_sub_index] = data.observed_value;
+                } else {
+                    Store.atom_lists[i][data.atom_index] = data.observed_value;
+                }
                 // update the formula tree with the values held in the atoms list
-                interpret_formula_tree(Store.formula_trees[i], Store.atom_lists[i]);
+                interpret_formula_tree(
+                    Store.formula_trees[i],
+                    Store.atom_lists[i],
+                    data.atom_index,
+                    data.atom_sub_index
+                );
                 // render the formula tree
                 render_formula_tree(data.property_hash, data.binding_index, i);
             }
@@ -189,18 +200,41 @@ var apply_event = function(event) {
             console.log(data.verdict);
             $("#" + data.property_hash + "-" + data.binding_index + "-" + global_formula_tree_index)
                 .parent().addClass(String(data.verdict));
+            var verdict_panel = $("#" + data.property_hash + "-" + data.binding_index + "-" + global_formula_tree_index)
+                .parent().find(".verdict");
+            verdict_panel.html(String(data.verdict));
+            verdict_panel.css({
+                width: $("#" + data.property_hash + "-" + data.binding_index + "-" + global_formula_tree_index)
+                .parent().outerWidth(),
+                height: $("#" + data.property_hash + "-" + data.binding_index + "-" + global_formula_tree_index)
+                .parent().outerHeight(),
+                "margin-top": -1 * $("#" + data.property_hash + "-" + data.binding_index + "-" + global_formula_tree_index)
+                .parent().outerHeight(),
+                "padding-top": 0.35 * $("#" + data.property_hash + "-" + data.binding_index + "-" + global_formula_tree_index)
+                .parent().outerHeight()
+            });
         });
     }
 };
 
-var interpret_formula_tree = function(formula_tree, atom_assignments) {
+var interpret_formula_tree = function(formula_tree, atom_assignments, atom_index, atom_sub_index) {
     // for a given set of atom assignments, recursively compute the version of the
     // formula tree with atoms replaced by those assignments
-    if(formula_tree.type == "atom") {
+    if(formula_tree.type == "atom" && formula_tree.atom_index == atom_index) {
         // replace the atom with the value held in the assignment
-        formula_tree.value = atom_assignments[formula_tree.atom_index];
+        formula_tree.value = atom_assignments[atom_index];
         // mark the atom as evaluated
         formula_tree.type = "evaluated";
+    } else if(formula_tree.type == "mixed-atom" && formula_tree.atom_index == atom_index) {
+        console.log("interpreting mixed atom");
+        console.log(atom_sub_index);
+        if(atom_sub_index == 0) {
+            // update lhs
+            formula_tree.lhs.value = atom_assignments[atom_index][atom_sub_index];
+        } else if(atom_sub_index == 1) {
+            // update rhs
+            formula_tree.rhs.value = atom_assignments[atom_index][atom_sub_index];
+        }
     }
 };
 
@@ -210,7 +244,7 @@ var render_formula_tree = function(property_hash, binding_index, formula_tree_in
     // set up the svg container for the graph
 
     // construct the graph
-    var g = new dagreD3.graphlib.Graph().setGraph({rankdir: 'LR'});
+    var g = new dagreD3.graphlib.Graph().setGraph({rankdir: 'TB', nodesep: 10});
     var formula_tree =  Store.formula_trees[formula_tree_index];
 
     // we now recursively traverse the formula tree to add to the graph
@@ -240,11 +274,28 @@ var render_formula_tree = function(property_hash, binding_index, formula_tree_in
 var build_graph = function(graph, subtree) {
     // recursive through a formula tree, adding to the graph as we go
     if(subtree.type == "atom" || subtree.type == "evaluated") {
-        // TODO: update to deal with mixed atoms
         graph.setNode(
             subtree.atom_index,
             {label : subtree.value, width : subtree.value.length*5 + 10, height: 20}
         );
+    } else if(subtree.type == "mixed-atom") {
+        // mixed atoms make subtrees, so construct root node
+        graph.setNode(
+            subtree.atom_index,
+            {label : subtree.value, width : subtree.value.length*5 + 10, height: 20}
+        );
+        // construct child nodes
+        graph.setNode(
+            subtree.atom_index + "-0",
+            {label : subtree.lhs.value, width : subtree.lhs.value.length*6 + 15, height: 20}
+        );
+        graph.setNode(
+            subtree.atom_index + "-1",
+            {label : subtree.rhs.value, width : subtree.rhs.value.length*6 + 15, height: 20}
+        );
+        // add edges
+        graph.setEdge(subtree.atom_index, subtree.atom_index + "-0", {});
+        graph.setEdge(subtree.atom_index, subtree.atom_index + "-1", {});
     }
 };
 

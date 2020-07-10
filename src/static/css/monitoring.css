@@ -9,12 +9,31 @@ div.formula_tree {
     border: white 2px solid;
 }
 
+div.formula_tree .verdict {
+    position: absolute;
+    display: none;
+    background: white;
+    font-weight: bold;
+    font-size: 24px;
+    text-transform: uppercase;
+    opacity: 0.8;
+    text-align: center;
+}
+
 div.formula_tree.true {
-    border: green 2px solid;
 }
 
 div.formula_tree.false {
-    border: red 2px solid;
+}
+
+div.formula_tree.true .verdict {
+    display: block;
+    color: green;
+}
+
+div.formula_tree.false .verdict {
+    display: block;
+    color: red;
 }
 
 div.formula-tree-list li {
