@@ -1,3 +1,7 @@
 .scfg, .binding-tree {
   text-align: center;
 }
+
+.panel-body.hidden {
+  display: none;
+}

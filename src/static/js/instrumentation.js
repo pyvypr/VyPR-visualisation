@@ -268,7 +268,6 @@ var render_binding_trees = function() {
     // Create a new directed graph
     var g = new dagreD3.graphlib.Graph().setGraph({});
 
-    // Set an object for the graph label
     g.setGraph({rankdir:'LR'});
 
     if(Store.binding_trees.length > 0) {
@@ -294,7 +293,7 @@ var render_binding_trees = function() {
                         g.setEdge(
                             binding_tree[i].id + "-" + binding_tree_index,
                             binding_tree[i].children[j] + "-" + binding_tree_index,
-                            {curve: d3.curveBasis}
+                            {}
                         );
                     }
                 }
@@ -327,7 +326,8 @@ var render_binding_trees = function() {
 var render_instrumentation_tree = function() {
     // code inspired by https://github.com/dagrejs/dagre/wiki#an-example-layout
     // Create a new directed graph
-    var g = new dagreD3.graphlib.Graph().setGraph({rankdir: 'LR'});
+    var g = new dagreD3.graphlib.Graph();
+    g.setGraph({rankdir: 'LR'});
 
     if(Store.instrumentation_tree != null) {
         // create an empty root vertex
@@ -342,7 +342,7 @@ var render_instrumentation_tree = function() {
                 binding,
                 {label : "Binding " + String(binding), width : 50, height: 20}
             );
-            g.setEdge("root", binding, {curve: d3.curveBasis});
+            g.setEdge("root", binding, {});
             for(var atom_index in Store.instrumentation_tree[binding]) {
                 // create a new vertex for this atom index
                 g.setNode(
@@ -352,7 +352,7 @@ var render_instrumentation_tree = function() {
                 g.setEdge(
                     binding,
                     binding + "-" + atom_index,
-                    {curve: d3.curveBasis}
+                    {}
                 );
                 for(var sub_atom_index in Store.instrumentation_tree[binding][atom_index]) {
                     // create a new vertex for this sub atom index
@@ -363,7 +363,7 @@ var render_instrumentation_tree = function() {
                     g.setEdge(
                         binding + "-" + atom_index,
                         binding + "-" + atom_index + "-" + sub_atom_index,
-                        {curve: d3.curveBasis}
+                        {}
                     );
                     for(var point in Store.instrumentation_tree[binding][atom_index][sub_atom_index]) {
                         var line_number = get_line_number_from_id(
@@ -380,7 +380,7 @@ var render_instrumentation_tree = function() {
                         g.setEdge(
                             binding + "-" + atom_index + "-" + sub_atom_index,
                             binding + "-" + atom_index + "-" + sub_atom_index + "-" + point,
-                            {curve: d3.curveBasis}
+                            {}
                         );
                     }
                 }
@@ -532,16 +532,22 @@ Vue.component("visualisation", {
     template : `
     <div id="visualisation" class="container-fluid">
         <div class="vis-on" v-if="dataReady">
+            <div class="col-sm-12">
+                <div class="panel panel-info">
+                  <div class="panel-heading">
+                    Symbolic Control-Flow Graph
+                    <a class="badge" v-bind:class="{active: !showSCFG}" href="#"
+                        @click="toggleSCFG($event)">collapse</a>
+                  </div>
+                  <div class="panel-body" v-bind:class="{hidden: !showSCFG}">
+                    <scfg></scfg>
+                  </div>
+                </div>
+            </div>
             <div class="col-sm-4">
                 <div class="panel panel-info">
                   <div class="panel-heading">Query</div>
                   <div class="panel-body" id="query" v-html="store.current_specification">
-                  </div>
-                </div>
-                <div class="panel panel-info">
-                  <div class="panel-heading">Symbolic Control-Flow Graph</div>
-                  <div class="panel-body">
-                    <scfg></scfg>
                   </div>
                 </div>
             </div>
@@ -590,12 +596,16 @@ Vue.component("visualisation", {
     `,
     data : function() {
         return {
-            store : Store
+            store : Store,
+            show_symbolic_control_flow_graph : true
         }
     },
     computed : {
         dataReady : function() {
             return this.store.selected_event_index != null;
+        },
+        showSCFG : function() {
+            return this.show_symbolic_control_flow_graph;
         }
     },
     methods : {
@@ -603,6 +613,10 @@ Vue.component("visualisation", {
             if(Store.highlighted_line_number == line_number) {
                 return "highlighted";
             } else return ""
+        },
+        toggleSCFG : function(e) {
+            e.preventDefault();
+            this.show_symbolic_control_flow_graph = !this.show_symbolic_control_flow_graph;
         }
     }
 });
@@ -619,10 +633,7 @@ Vue.component("scfg", {
         // code inspired by https://github.com/dagrejs/dagre/wiki#an-example-layout
 
         // Create a new directed graph
-        var g = new dagreD3.graphlib.Graph().setGraph({});
-
-        // Set an object for the graph label
-        g.setGraph({});
+        var g = new dagreD3.graphlib.Graph().setGraph({rankdir: 'LR', nodesep: 50});
 
         var scfg = this.store.events[this.store.most_recent_function_start_event_index].data.scfg;
 
@@ -638,7 +649,7 @@ Vue.component("scfg", {
         // set up edges
         for(var i=0; i<scfg.length; i++) {
             for(var j=0; j<scfg[i].children.length; j++) {
-                g.setEdge(scfg[i].id, scfg[i].children[j], {curve: d3.curveBasis});
+                g.setEdge(scfg[i].id, scfg[i].children[j], {});
             }
         }
 
@@ -652,7 +663,7 @@ Vue.component("scfg", {
         render(inner, g);
 
         svg.attr('height', g.graph().height + 40);
-        svg.attr('width', g.graph().width);
+        svg.attr('width', "100%");
     }
 });
 
