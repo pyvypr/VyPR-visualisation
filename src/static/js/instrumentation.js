@@ -3,7 +3,7 @@ var Store = {
     id_to_event : {},
     selected_event_index : null,
     highlighted_scfg_vertex : null,
-    highlighted_line_number : null,
+    highlighted_line_numbers : [],
     highlighted_spec_variable : null,
     current_code_listing : [],
     current_function : null,
@@ -17,6 +17,26 @@ var Store = {
 /******************
 Visualisation Logic
 *******************/
+
+var resetAtomHighlighting = function() {
+    $(".atom").removeClass("highlight");
+    $(".subatom").removeClass("highlight");
+    $(".variable-def").removeClass("highlight");
+    //$(".code-line").removeClass("highlight");
+    Store.highlighted_line_numbers = [];
+};
+
+var highlightLinesFromIDs = function(ids) {
+    if(ids.length > 1) {
+        var code_line = get_line_number_from_id(ids[1]).replace("Line ", "");
+        //$(".code-line[line=" + code_line + "]").addClass("highlight");
+        Store.highlighted_line_numbers.push(parseInt(code_line));
+    } else {
+        var code_line = get_line_number_from_id(ids[0]).replace("Line ", "");
+        $(".code-line[line=" + code_line + "]").addClass("highlight");
+        Store.highlighted_line_numbers.push(parseInt(code_line));
+    }
+};
 
 var get_state_changed_from_id = function(id) {
     // given a vertex ID, get the state information held there
@@ -45,7 +65,7 @@ var highlight_line_from_vertex_id = function(vertex_id) {
     var scfg = Store.events[Store.most_recent_function_start_event_index].data.scfg;
     for(var i=0; i<scfg.length; i++) {
         if(scfg[i].id == vertex_id) {
-            Store.highlighted_line_number = scfg[i].line_number
+            Store.highlighted_line_numbers = [scfg[i].line_number];
         }
     }
 };
@@ -69,6 +89,18 @@ var highlight_backwards = function(event) {
             ]
         );
     }
+
+    if(Store.id_to_event[event.id-1].action_to_perform == "find_inst_set") {
+        event = Store.id_to_event[event.id-1];
+        highlightLinesFromIDs(event.data.points.lhs);
+        highlightLinesFromIDs(event.data.points.rhs);
+    }
+
+    if(Store.id_to_event[event.id-1].action_to_perform == "new_binding") {
+        highlight_line_from_vertex_id(Store.id_to_event[event.id-1].data.vertex_id);
+        // highlight the relevant variable
+        $(".variable-def[variable=0]").addClass("highlight");
+    }
 };
 
 var highlight_forwards = function(event) {
@@ -81,6 +113,8 @@ var highlight_forwards = function(event) {
     } else if(event.action_to_perform == "new_binding") {
         Store.highlighted_scfg_vertex = event.data.vertex_id;
         highlight_line_from_vertex_id(event.data.vertex_id);
+        // highlight the relevant variable
+        $(".variable-def[variable=0]").addClass("highlight");
     } else if(event.action_to_perform == "complete_binding") {
         Store.highlighted_scfg_vertex = event.data.vertex_ids[
             event.data.vertex_ids.length-1
@@ -90,6 +124,9 @@ var highlight_forwards = function(event) {
                 event.data.vertex_ids.length-1
             ]
         );
+    } else if(event.action_to_perform == "find_inst_set") {
+        highlightLinesFromIDs(event.data.points.lhs);
+        highlightLinesFromIDs(event.data.points.rhs);
     }
 };
 
@@ -156,6 +193,7 @@ var apply_event = function(event, direction) {
     // direction is either "forwards" or "backwards" and affects how we apply the event
     // note: when we replay an event, we always assume that the existing state is immediately before
     // or after the event, since we cannot jump between events without applying each one in between.
+    resetAtomHighlighting();
     if(direction == "forwards") {
         if(event.action_to_perform == "new_binding") {
             // start a new binding tree and add a new vertex
@@ -562,7 +600,7 @@ Vue.component("visualisation", {
                             <td class="number"></td>
                             <td class="code-wrapper">...</td>
                         </tr>
-                        <tr class="code-line" v-for="line in store.current_code_listing"
+                        <tr class="code-line" v-bind:line="line.number" v-for="line in store.current_code_listing"
                             v-bind:class="getLineHighlightStatus(line.number)">
                             <td class="number">{{ line.number }}</td>
                             <td class="code-wrapper"><pre class="code">{{ line.code }}</pre></td>
@@ -610,8 +648,8 @@ Vue.component("visualisation", {
     },
     methods : {
         getLineHighlightStatus : function(line_number) {
-            if(Store.highlighted_line_number == line_number) {
-                return "highlighted";
+            if(Store.highlighted_line_numbers.indexOf(line_number) != -1) {
+                return "highlight";
             } else return ""
         },
         toggleSCFG : function(e) {

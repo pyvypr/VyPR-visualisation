@@ -74,6 +74,7 @@ div.left-column {
     margin-top: -20px;
     margin-left: 400px;
     width: 200px;
+    z-index: 2000;
 }
 
 div:hover > .tooltip, span:hover > .tooltip {
@@ -160,4 +161,5 @@ a.badge.active {
     margin-top: -20px;
     width: 500px;
     height: 170px;
+    z-index: 1000;
 }

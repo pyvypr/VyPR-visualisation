@@ -22,6 +22,7 @@ div.formula_tree .verdict {
     text-transform: uppercase;
     opacity: 0.8;
     text-align: center;
+    z-index: 500;
 }
 
 div.formula_tree.true {

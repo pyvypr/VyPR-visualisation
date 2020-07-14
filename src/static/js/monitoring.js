@@ -591,11 +591,11 @@ Vue.component("visualisation", {
                     <a class="badge" @mouseover="toggleInfo($event)" @mouseout="toggleInfo($event)">?</a>
                   </div>
                   <div class="panel-body" id="code">
-                    <div class="info-panel">
+                    <!--<div class="info-panel">
                       <p>The function in source code that was monitored by VyPR at runtime.</p>
                       <p>As monitoring progresses, the statements at which measurements were made at runtime
                       are highlighted here.</p>
-                    </div>
+                    </div>-->
                     <instrument-fired></instrument-fired>
                     <table>
                         <tr class="code-line-skip" v-if="currentCodeListing[0].number > 1">
