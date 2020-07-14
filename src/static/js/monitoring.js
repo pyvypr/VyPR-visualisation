@@ -35,6 +35,12 @@ var reset_store = function(store) {
     Store.play_interval = null;
 };
 
+var resetAtomHighlighting = function() {
+    $(".atom").removeClass("highlight");
+    $(".subatom").removeClass("highlight");
+    $(".variable-def").removeClass("highlight");
+};
+
 var play = function() {
     // this is only ever set inside an interval
     // advance events by replaying from current position onwards.
@@ -93,6 +99,8 @@ var replay_events = function(start_index, end_index) {
         // to the previous event
         reset_store();
         select_event(end_index);
+        // call reset here just in case there are no events to apply
+        resetAtomHighlighting();
         for(var i=1; i<=end_index; i++) {
             apply_event(Store.events[i]);
         }
@@ -103,9 +111,13 @@ var apply_event = function(event) {
     // event is a dictionary with an action and data
     // direction is always forwards for monitoring because information is often deleted so to reconstruct it
     // we have to replay the whole monitoring process.
+    resetAtomHighlighting();
     var data = event.data;
     if(event.action_to_perform == "trigger-new-monitor") {
         Store.most_recent_instrument_fired = event;
+        // highlight the variable
+        resetAtomHighlighting();
+        $(".variable-def[variable=" + event.data.variable_index + "]").addClass("highlight");
         // add a new formula tree to the list of monitors by copy
         formula_tree_copy = JSON.parse(JSON.stringify(data.formula_tree));
         Store.formula_trees.push(formula_tree_copy);
@@ -161,6 +173,12 @@ var apply_event = function(event) {
         for(var i=0; i<Store.property_binding_maps.length; i++) {
             if(Store.property_binding_maps[i].property_hash == data.property_hash &&
                 Store.property_binding_maps[i].binding_index == data.binding_index) {
+                // update the line number highlighting
+                Store.highlighted_line_number = data.line_number;
+                // highlight the relevant atom/sub-atom in the specification
+                resetAtomHighlighting();
+                $(".atom[atom-index=" + data.atom_index + "]").toggleClass("highlight");
+                $(".subatom[subatom-index=" + data.atom_sub_index + "]").toggleClass("highlight");
                 // update the value to which the relevant atom is mapped
                 if(Store.formula_trees[i].type == "mixed-atom") {
                     Store.atom_lists[i][data.atom_index][data.atom_sub_index] = data.observed_value;
@@ -437,13 +455,13 @@ Vue.component("instrument-fired", {
 
                 <p><b>Trigger for a new monitor</b></p>
                 <!--<p><b>Property hash:</b> {{ mostRecentInstrument.data.property_hash }}</p>-->
-                <p><b>Generating source code line:</b>
+                <!--<p><b>Generating source code line:</b>
                 {{ store.current_bindings[mostRecentInstrument.data.binding_index]
                     [mostRecentInstrument.data.variable_index] }}
-                </p>
+                </p>-->
+                <p><b>Variable matched:</b> {{ store.current_variables[mostRecentInstrument.data.variable_index] }}</p>
                 <p><b>Observed values to copy:</b>
                  {{ mostRecentInstrument.data.observed_values }}</p>
-                <p><b>Variable matched:</b> {{ store.current_variables[mostRecentInstrument.data.variable_index] }}</p>
             </div>
             <div v-else-if="mostRecentInstrument.action_to_perform == 'receive-measurement'">
 
@@ -457,11 +475,10 @@ Vue.component("instrument-fired", {
 
                 <p><b>Update a monitor with a measurement</b></p>
                 <!--<p><b>Property hash:</b> {{ mostRecentInstrument.data.property_hash }}</p>-->
-                <p><b>Relevant source code lines:</b>
-                {{ store.current_bindings[mostRecentInstrument.data.binding_index] }}
+                <!--<p><b>Relevant source code line:</b> {{ mostRecentInstrument.data.line_number }}-->
                 </p>
-                <p><b>Atom and sub-atom indices:</b> {{ mostRecentInstrument.data.atom_index }},
-                {{ mostRecentInstrument.data.atom_sub_index }}</p>
+                <!--<p><b>Atom/sub-atom indices:</b> {{ mostRecentInstrument.data.atom_index }} /
+                {{ mostRecentInstrument.data.atom_sub_index }}</p>-->
                 <p><b>Measurement </b>
                  {{ mostRecentInstrument.data.observed_value }}<b> starting from </b>
                  {{ mostRecentInstrument.data.observation_start_time }}<b> and ending at </b>
@@ -570,7 +587,7 @@ Vue.component("visualisation", {
 
                 <div class="panel panel-info">
                   <div class="panel-heading">
-                    Code - <b>{{ store.current_function }}</b>
+                    Run of <b>{{ store.current_function }}</b>
                     <a class="badge" @mouseover="toggleInfo($event)" @mouseout="toggleInfo($event)">?</a>
                   </div>
                   <div class="panel-body" id="code">
@@ -579,6 +596,7 @@ Vue.component("visualisation", {
                       <p>As monitoring progresses, the statements at which measurements were made at runtime
                       are highlighted here.</p>
                     </div>
+                    <instrument-fired></instrument-fired>
                     <table>
                         <tr class="code-line-skip" v-if="currentCodeListing[0].number > 1">
                             <td class="number"></td>
@@ -595,15 +613,6 @@ Vue.component("visualisation", {
             </div>
 
             <div class="col-sm-7">
-                <div class="panel panel-info">
-                  <div class="panel-heading">
-                    Most Recent Instrument Fired
-                    <a class="badge" @mouseover="toggleInfo($event)" @mouseout="toggleInfo($event)">?</a>
-                  </div>
-                  <div class="panel-body">
-                    <instrument-fired></instrument-fired>
-                  </div>
-                </div>
 
                 <div class="panel panel-info">
                   <div class="panel-heading">
@@ -637,7 +646,7 @@ Vue.component("visualisation", {
     methods : {
         getLineHighlightStatus : function(line_number) {
             if(Store.highlighted_line_number == line_number) {
-                return "highlighted";
+                return "highlight";
             } else return ""
         },
         toggleInfo : function(e) {

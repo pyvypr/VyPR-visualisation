@@ -82,10 +82,11 @@ div:hover > .tooltip, span:hover > .tooltip {
     transition: opacity 1s;
 }
 
-.atom {
+.subatom.highlight, .variable-def.highlight {
     background: lightgrey;
     padding: 5px;
     border-radius: 5px 5px 5px 5px;
+    box-shadow: 1px 1px 1px 1px grey;
 }
 
 .panel-body#code pre {
@@ -95,8 +96,11 @@ div:hover > .tooltip, span:hover > .tooltip {
     margin: 0;
 }
 
-.code-line.highlighted {
+.code-line.highlight > .code-wrapper {
     background: #CCC;
+    padding: 5px;
+    border-radius: 5px 5px 5px 5px;
+    box-shadow: 1px 1px 1px 1px grey;
 }
 
 .code-line .number {

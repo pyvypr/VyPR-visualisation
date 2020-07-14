@@ -1,3 +1,7 @@
+.instrument-fired {
+    padding: 10px;
+}
+
 div.formula_trees {
     display: flex;
     flex-direction: row;
