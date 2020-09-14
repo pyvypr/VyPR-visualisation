@@ -91,6 +91,6 @@ This will generate verdict data with respect to the queries in `VyPR_queries.py`
 The visualisation data is now generated, so you need to launch the visualisation tool to display it.  In the terminal
 in which you set up the visualisation tool, run
 ```
-python launch.py --port 8080 --instrumentation-stream http://localhost:9002/event_stream/instrumentation/ \
+python src/launch.py --port 8080 --instrumentation-stream http://localhost:9002/event_stream/instrumentation/ \
 --monitoring-stream http://localhost:9002/eventtream/monitoring/
 ```
