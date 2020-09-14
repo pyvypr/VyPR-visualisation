@@ -94,7 +94,3 @@ in which you set up the visualisation tool, run
 python launch.py --port 8080 --instrumentation-stream http://localhost:9002/event_stream/instrumentation/ \
 --monitoring-stream http://localhost:9002/eventtream/monitoring/
 ```
-
-Launch the visualisation tool with, for example,
-`python launch.py --port 9000 --instrumentation-stream http://.../event_stream/instrumentation/ --monitoring-stream http://.../event_stream/monitoring/`
-With the visualisation tool launched, `http://localhost:9000/` in your browser and go from there.
