@@ -1,18 +1,26 @@
 <html>
 <head>
     <title>VyPR Visualisation Tool</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
 </head>
 <body>
-    <h1>Visualisation Tool for VyPR</h1>
-    <p>Using event streams:</p>
-    <ul>
-        <li>{{ inst_event_stream_url }} for instrumentation visualisation</li>
-        <li>{{ mon_event_stream_url }} for monitoring visualisation</li>
-    </ul>
-    <p>Go to visualisation for:</p>
-    <ul>
-        <li><a href="/instrumentation/">Instrumentation</a></li>
-        <li><a href="/monitoring/">Monitoring</a></li>
-    </ul>
+    <div class="container-fluid">
+        <h1>Visualisation Tool for VyPR</h1>
+        <p>This visualisation tool enables you to see what goes on behind the scenes when VyPR instruments and monitors a Python program.</p>
+        <h4>Getting Started</h4>
+        <p>In order to generate instrumentation events to visualise, you should run</p>
+        <pre>python VyPR/instrument.py</pre>
+        <p>from the root directory of the Python project whose performance analysis you would like to visualise.</p>
+        <p>Finally, to generate monitoring events to visualise, you should run your program as normal.  VyPR will perform monitoring automatically, in the background.</p>
+        <h4>Visualisation</h4>
+        <p>Go to <a href="/instrumentation/" class="btn btn-primary">Instrumentation</a> to see how instrumentation took place, and <a href="/monitoring/" class="btn btn-primary">Monitoring</a> to see how monitoring took place.</li>
+        </ul>
+        <h4>Configuration</h4>
+        <p>Configured end-points on VyPRServer that will be used to get events to visualise are:</p>
+        <ul>
+            <li>{{ inst_event_stream_url }} for instrumentation visualisation</li>
+            <li>{{ mon_event_stream_url }} for monitoring visualisation</li>
+        </ul>
+    </div>
 </body>
 </html>
